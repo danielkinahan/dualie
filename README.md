@@ -1,9 +1,3 @@
 # desktop-synthesizer
 
-## Author
-
-<!-- Insert Your Name Here -->
-
-## Description
-
-<!-- Describe your example here -->
+A polyphonic, multi-oscillator synth with many bells and many whistles. Based around the Daisy Seed platform.
