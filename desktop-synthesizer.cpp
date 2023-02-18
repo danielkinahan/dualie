@@ -11,8 +11,6 @@ static Encoder enc;
 static MidiUsbHandler midi;
 static AdEnv env;
 
-bool trigger;
-
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
     float env_out;
@@ -31,12 +29,12 @@ int main(void)
     hw.StartLog();
     hw.PrintLine("Hello world!");
 
-    trigger = false;
-
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
     midi_cfg.transport_config.periph = MidiUsbTransport::Config::INTERNAL;
     midi.Init(midi_cfg);
+
+    enc.Init(hw.GetPin(0), hw.GetPin(2), hw.GetPin(1));
 
     // Initialize test tone
     osc.Init(hw.AudioSampleRate());
@@ -50,12 +48,20 @@ int main(void)
 
     osc.SetWaveform(osc.WAVE_TRI);
     osc.SetFreq(220);
-    osc.SetAmp(0.25);
+
+    float decay = 0.35;
+    float timeIncr = 0.05;
 
     // start the audio callback
     hw.StartAudio(AudioCallback);
     while(1)
     {
+        enc.Debounce();
+        int incrVal = enc.Increment();
+        if( incrVal != 0){
+            decay += (incrVal * timeIncr);
+        }
+        env.SetTime(ADENV_SEG_DECAY, decay);
         // Listen to MIDI
         midi.Listen();
 
