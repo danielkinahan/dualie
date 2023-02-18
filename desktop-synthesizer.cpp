@@ -5,20 +5,17 @@ using namespace daisy;
 using namespace daisysp;
 using namespace daisy::seed;
 
-static DaisySeed hw;
-static Oscillator osc;
-static Encoder enc;
+static DaisySeed      hw;
+static Oscillator     osc;
+static Encoder        enc;
 static MidiUsbHandler midi;
-static AdEnv env;
+static Adsr           env;
+bool                  gate;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
-    float env_out;
     for(size_t i = 0; i < size; i++){
-        
-        env_out = env.Process();
-        osc.SetAmp(env_out);
-    
+        osc.SetAmp(env.Process(gate));
         out[0][i] = out[1][i] = osc.Process();
     }
 }
@@ -26,8 +23,6 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
 int main(void)
 {
     hw.Init();
-    hw.StartLog();
-    hw.PrintLine("Hello world!");
 
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
@@ -40,28 +35,76 @@ int main(void)
     osc.Init(hw.AudioSampleRate());
     env.Init(hw.AudioSampleRate());
 
-    env.SetTime(ADENV_SEG_ATTACK, 0.15);
-    env.SetTime(ADENV_SEG_DECAY, 0.35);
-    env.SetMin(0.0);
-    env.SetMax(0.25);
-    env.SetCurve(0); // linear
+    float ctrlAmp = 0.5;
+    float ctrlAttack = 0.1;
+    float ctrlDecay = 0.35;
+    float ctrlSustain = 0.25;
+    float ctrlRelease = 0.01;
+    float timeIncr = 0.05;
+    float volIncr = 0.05;
+    int param = 0;
+
+    env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
+    env.SetTime(ADENV_SEG_DECAY, ctrlDecay);
+    env.SetSustainLevel(ctrlSustain);
+    env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
 
     osc.SetWaveform(osc.WAVE_TRI);
-    osc.SetFreq(220);
-
-    float decay = 0.35;
-    float timeIncr = 0.05;
+    osc.SetAmp(ctrlAmp);
 
     // start the audio callback
     hw.StartAudio(AudioCallback);
     while(1)
     {
         enc.Debounce();
+
+        //Process parameter selection
+        if(enc.Pressed())
+        {
+            param++;
+            if (param >= 4){
+                param = 0;
+            }
+            hw.DelayMs(300);
+        }
+
+        //Process paramater value changed
         int incrVal = enc.Increment();
         if( incrVal != 0){
-            decay += (incrVal * timeIncr);
+            switch(param)
+            {
+                case 0:
+                {
+                    ctrlAttack += (incrVal * timeIncr);
+                    env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
+                }
+                break;
+                case 1:
+                {
+                    ctrlDecay += (incrVal * timeIncr);
+                    env.SetTime(ADENV_SEG_DECAY, ctrlDecay);
+                }
+                break;
+                case 2:
+                {
+                    if ((ctrlSustain>=ctrlAmp) & (incrVal>0))
+                    {
+                        break;
+                    }
+                    ctrlSustain += (incrVal * volIncr);
+                    env.SetSustainLevel(ctrlSustain);
+                }
+                break;
+                case 3:
+                {
+                    ctrlRelease += (incrVal * timeIncr);
+                    env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
+                }
+                break;
+
+                default: break;
+            }
         }
-        env.SetTime(ADENV_SEG_DECAY, decay);
         // Listen to MIDI
         midi.Listen();
 
@@ -78,14 +121,24 @@ int main(void)
                     auto note_msg = msg.AsNoteOn();
                     if(note_msg.velocity != 0){
                         osc.SetFreq(mtof(note_msg.note));
-                        env.Trigger();
+                        gate = true;
+                        env.Retrigger(false);
+                    }
+                    else
+                    {
+                        gate = false;
                     }
                 }
                 break;
-                    // Since we only care about note-on messages in this example
-                    // we'll ignore all other message types
+                case NoteOff:
+                {
+                    gate = false;
+                }
+                break;
+
                 default: break;
             }
         }
+
     }
 }
