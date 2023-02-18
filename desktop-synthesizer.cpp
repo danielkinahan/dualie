@@ -35,6 +35,7 @@ int main(void)
     osc.Init(hw.AudioSampleRate());
     env.Init(hw.AudioSampleRate());
 
+    int waveType = 0;
     float ctrlAmp = 0.5;
     float ctrlAttack = 0.1;
     float ctrlDecay = 0.35;
@@ -42,6 +43,7 @@ int main(void)
     float ctrlRelease = 0.01;
     float timeIncr = 0.05;
     float volIncr = 0.05;
+    int fixedIncr = 1;
     int param = 0;
 
     env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
@@ -49,7 +51,7 @@ int main(void)
     env.SetSustainLevel(ctrlSustain);
     env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
 
-    osc.SetWaveform(osc.WAVE_TRI);
+    osc.SetWaveform(osc.WAVE_SIN);
     osc.SetAmp(ctrlAmp);
 
     // start the audio callback
@@ -75,17 +77,37 @@ int main(void)
             {
                 case 0:
                 {
+                    waveType += (incrVal * fixedIncr);
+                    waveType = waveType % 4;
+                    switch(waveType)
+                    {
+                        case 0:
+                            osc.SetWaveform(osc.WAVE_SIN);
+                            break;
+                        case 1:
+                            osc.SetWaveform(osc.WAVE_TRI);
+                            break;
+                        case 2:
+                            osc.SetWaveform(osc.WAVE_SAW);
+                            break;
+                        case 3:
+                            osc.SetWaveform(osc.WAVE_SQUARE);
+                            break;
+                    }
+                }
+                case 1:
+                {
                     ctrlAttack += (incrVal * timeIncr);
                     env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
                 }
                 break;
-                case 1:
+                case 2:
                 {
                     ctrlDecay += (incrVal * timeIncr);
                     env.SetTime(ADENV_SEG_DECAY, ctrlDecay);
                 }
                 break;
-                case 2:
+                case 3:
                 {
                     if ((ctrlSustain>=ctrlAmp) & (incrVal>0))
                     {
@@ -95,7 +117,7 @@ int main(void)
                     env.SetSustainLevel(ctrlSustain);
                 }
                 break;
-                case 3:
+                case 4:
                 {
                     ctrlRelease += (incrVal * timeIncr);
                     env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
