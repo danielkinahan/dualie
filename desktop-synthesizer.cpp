@@ -12,6 +12,16 @@ static MidiUsbHandler midi;
 static Adsr           env;
 bool                  gate;
 
+int waveType = 0;
+float ctrlAmp = 0.5;
+int ctrlAttack = 12;
+int ctrlDecay = 30;
+int ctrlSustain = 25;
+int ctrlRelease = 10;
+
+//int timeIncr = 0.05;
+//int volIncr = 0.05;
+
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
     for(size_t i = 0; i < size; i++){
@@ -20,6 +30,89 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
     }
 }
 
+void HandleControls(int ctrlValue, int param, bool midiCC)
+{
+    //Process paramater value changed
+    switch(param)
+    {
+        case 0:
+        {
+            if (midiCC){
+                waveType = ctrlValue;
+            }
+            else
+            {
+                waveType += ctrlValue;
+            }
+            
+            switch(waveType / 32)
+            {
+                case 0:
+                    osc.SetWaveform(osc.WAVE_SIN);
+                    break;
+                case 1:
+                    osc.SetWaveform(osc.WAVE_TRI);
+                    break;
+                case 2:
+                    osc.SetWaveform(osc.WAVE_SAW);
+                    break;
+                case 3:
+                    osc.SetWaveform(osc.WAVE_SQUARE);
+                    break;
+            }
+        }
+        case 1:
+        {
+            if (midiCC){
+                ctrlAttack = ctrlValue;
+            }
+            else
+            {
+                ctrlAttack += ctrlValue;
+            }
+            env.SetTime(ADENV_SEG_ATTACK, (ctrlAttack / 32.f));
+        }
+        break;
+        case 2:
+        {
+            if (midiCC){
+                ctrlDecay = ctrlValue;
+            }
+            else
+            {
+                ctrlDecay += ctrlValue;
+            }
+            env.SetTime(ADENV_SEG_DECAY, (ctrlDecay / 32.f));
+        }
+        break;
+        case 3:
+        {
+            if (midiCC){
+                ctrlSustain = ctrlValue;
+            }
+            else
+            {
+                ctrlSustain += ctrlValue;
+            }
+            env.SetSustainLevel(ctrlSustain / 127.f);
+        }
+        break;
+        case 4:
+        {
+            if (midiCC){
+                ctrlRelease = ctrlValue;
+            }
+            else
+            {
+                ctrlRelease += ctrlValue;
+            }
+            env.SetTime(ADSR_SEG_RELEASE, (ctrlRelease / 64.f));
+        }
+        break;
+
+        default: break;
+    }
+}
 int main(void)
 {
     hw.Init();
@@ -35,21 +128,13 @@ int main(void)
     osc.Init(hw.AudioSampleRate());
     env.Init(hw.AudioSampleRate());
 
-    int waveType = 0;
-    float ctrlAmp = 0.5;
-    float ctrlAttack = 0.1;
-    float ctrlDecay = 0.35;
-    float ctrlSustain = 0.25;
-    float ctrlRelease = 0.01;
-    float timeIncr = 0.05;
-    float volIncr = 0.05;
-    int fixedIncr = 1;
+    //int fixedIncr = 1;
     int param = 0;
 
-    env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
-    env.SetTime(ADENV_SEG_DECAY, ctrlDecay);
-    env.SetSustainLevel(ctrlSustain);
-    env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
+    env.SetTime(ADENV_SEG_ATTACK, ctrlAttack / 32.f);
+    env.SetTime(ADENV_SEG_DECAY, ctrlDecay / 32.f);
+    env.SetSustainLevel(ctrlSustain / 127.f);
+    env.SetTime(ADSR_SEG_RELEASE, ctrlRelease / 64.f);
 
     osc.SetWaveform(osc.WAVE_SIN);
     osc.SetAmp(ctrlAmp);
@@ -59,7 +144,6 @@ int main(void)
     while(1)
     {
         enc.Debounce();
-
         //Process parameter selection
         if(enc.Pressed())
         {
@@ -69,63 +153,9 @@ int main(void)
             }
             hw.DelayMs(300);
         }
-
-        //Process paramater value changed
-        int incrVal = enc.Increment();
-        if( incrVal != 0){
-            switch(param)
-            {
-                case 0:
-                {
-                    waveType += (incrVal * fixedIncr);
-                    waveType = waveType % 4;
-                    switch(waveType)
-                    {
-                        case 0:
-                            osc.SetWaveform(osc.WAVE_SIN);
-                            break;
-                        case 1:
-                            osc.SetWaveform(osc.WAVE_TRI);
-                            break;
-                        case 2:
-                            osc.SetWaveform(osc.WAVE_SAW);
-                            break;
-                        case 3:
-                            osc.SetWaveform(osc.WAVE_SQUARE);
-                            break;
-                    }
-                }
-                case 1:
-                {
-                    ctrlAttack += (incrVal * timeIncr);
-                    env.SetTime(ADENV_SEG_ATTACK, ctrlAttack);
-                }
-                break;
-                case 2:
-                {
-                    ctrlDecay += (incrVal * timeIncr);
-                    env.SetTime(ADENV_SEG_DECAY, ctrlDecay);
-                }
-                break;
-                case 3:
-                {
-                    if ((ctrlSustain>=ctrlAmp) & (incrVal>0))
-                    {
-                        break;
-                    }
-                    ctrlSustain += (incrVal * volIncr);
-                    env.SetSustainLevel(ctrlSustain);
-                }
-                break;
-                case 4:
-                {
-                    ctrlRelease += (incrVal * timeIncr);
-                    env.SetTime(ADSR_SEG_RELEASE, ctrlRelease);
-                }
-                break;
-
-                default: break;
-            }
+        if( enc.Increment() != 0)
+        {
+            HandleControls(enc.Increment(), param, false);
         }
         // Listen to MIDI
         midi.Listen();
@@ -152,11 +182,20 @@ int main(void)
                     }
                 }
                 break;
+
                 case NoteOff:
                 {
                     gate = false;
                 }
                 break;
+
+                case ControlChange:
+                {
+                    auto ctrl_msg = msg.AsControlChange();
+                    HandleControls(ctrl_msg.value, ctrl_msg.control_number, true);
+                }
+                break;
+                
 
                 default: break;
             }
