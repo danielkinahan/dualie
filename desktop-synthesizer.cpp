@@ -6,7 +6,7 @@ using namespace daisysp;
 using namespace daisy::seed;
 
 static DaisySeed      hw;
-static Oscillator     osc;
+static Oscillator     osc, lfo;
 static Encoder        enc;
 static MidiUsbHandler midi;
 static Adsr           env;
@@ -21,14 +21,20 @@ int ctrlSustain = 25;
 int ctrlRelease = 10;
 int ctrlFilterFreq = 100;
 int ctrlFilterRes = 10;
+int ctrlLFOFreq = 20;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
-    float env_out, osc_out;
+    float env_out, osc_out, freq, modulated_freq;
     for(size_t i = 0; i < size; i++){
         env_out = env.Process(gate);
         osc.SetAmp(env_out);
         osc_out = osc.Process();
+
+        //flt.SetFreq(ctrlFilterFreq * 174 * lfo.Process());
+        freq = ctrlFilterFreq * 174;
+        modulated_freq = freq + (lfo.Process() * freq);
+        flt.SetFreq(modulated_freq);
         
         out[0][i] = out[1][i] = flt.Process(osc_out);
     }
@@ -122,7 +128,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
             {
                 ctrlFilterFreq += ctrlValue;
             }
-            flt.SetFreq(ctrlFilterFreq * 174);
+            //flt.SetFreq(ctrlFilterFreq * 174);
         }
         break;
         case 6:
@@ -137,10 +143,23 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
             flt.SetRes(ctrlFilterRes / 134.0f);
         }
         break;
+        case 7:
+        {
+            if (midiCC){
+                ctrlLFOFreq = ctrlValue;
+            }
+            else
+            {
+                ctrlLFOFreq += ctrlValue;
+            }
+            lfo.SetFreq(ctrlLFOFreq / 6.4f);
+        }
+        break;
 
         default: break;
     }
 }
+
 int main(void)
 {
     hw.Init();
@@ -148,12 +167,13 @@ int main(void)
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
     midi_cfg.transport_config.periph = MidiUsbTransport::Config::INTERNAL;
-    midi.Init(midi_cfg);
 
+    midi.Init(midi_cfg);
     enc.Init(hw.GetPin(0), hw.GetPin(2), hw.GetPin(1));
     osc.Init(hw.AudioSampleRate());
     env.Init(hw.AudioSampleRate());
     flt.Init(hw.AudioSampleRate());
+    lfo.Init(hw.AudioSampleRate());
 
     int param = 0;
 
@@ -169,6 +189,11 @@ int main(void)
     flt.SetFreq(ctrlFilterFreq * 174);
     //Awful sounds at values past 0.95!
     flt.SetRes(ctrlFilterRes / 134.0f);
+
+    lfo.SetAmp(1);
+    lfo.SetWaveform(Oscillator::WAVE_SIN);
+    //TODO: Change this from linear to logarithmic scaling
+    lfo.SetFreq(ctrlLFOFreq / 6.4f);
 
     // start the audio callback
     hw.StartAudio(AudioCallback);
