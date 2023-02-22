@@ -79,57 +79,23 @@ class Voice
         switch(param)
         {
             case 0:
-            {
                 switch(ControlPanel[param].value / 32)
                 {
-                    case 0:
-                        osc_.SetWaveform(osc_.WAVE_SIN);
-                        break;
-                    case 1:
-                        osc_.SetWaveform(osc_.WAVE_TRI);
-                        break;
-                    case 2:
-                        osc_.SetWaveform(osc_.WAVE_SAW);
-                        break;
-                    case 3:
-                        osc_.SetWaveform(osc_.WAVE_SQUARE);
-                        break;
+                    case 0: osc_.SetWaveform(osc_.WAVE_SIN); break;
+                    case 1: osc_.SetWaveform(osc_.WAVE_TRI); break;
+                    case 2: osc_.SetWaveform(osc_.WAVE_SAW); break;
+                    case 3: osc_.SetWaveform(osc_.WAVE_SQUARE); break;
+                    default: break;
                 }
-            }
             break;
-            case 1:
-            {
-                env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f));
-            }
-            break;
-            case 2:
-            {
-                env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f));
-            }
-            break;
-            case 3:
-            {
-                env_.SetSustainLevel(ControlPanel[param].value / 127.f);
-            }
-            break;
-            case 4:
-            {
-                env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));
-            }
-            break;
-            case 5:
-            {
-                //TODO: Change this from linear to logarithmic scaling
-                filt_.SetFreq(ControlPanel[param].value * 174);
-            }
-            break;
-            case 6:
-            {
-                //Awful sounds at values past 0.95!
-                filt_.SetRes(ControlPanel[param].value / 134.0f);
-            }
-            break;
-
+            case 1: env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f)); break;
+            case 2: env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f)); break;
+            case 3: env_.SetSustainLevel(ControlPanel[param].value / 127.f); break;
+            case 4: env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));break;
+            //TODO: Change this from linear to logarithmic scaling
+            case 5: filt_.SetFreq(ControlPanel[param].value * 174); break;
+            //Awful sounds at values past 0.95!
+            case 6: filt_.SetRes(ControlPanel[param].value / 134.0f); break;
             default: break;
         }
     }
