@@ -1,5 +1,6 @@
 #include "daisy_seed.h"
 #include "daisysp.h"
+#include <string>
 
 using namespace daisy;
 using namespace daisysp;
@@ -14,6 +15,23 @@ int ctrlRelease = 10;
 int ctrlFilterFreq = 100;
 int ctrlFilterRes = 10;
 int ctrlLFOFreq = 20;
+
+struct Control
+{
+    std::string name;
+    int value;
+};
+
+Control ControlPanel[20] = {
+    {"waveType", 0},
+    {"ctrlAttack", 12},
+    {"ctrlDecay", 30},
+    {"ctrlSustain", 25},
+    {"ctrlRelease", 10},
+    {"ctrlFilterFreq", 100},
+    {"ctrlFilterRes", 10},
+    {"ctrlLFOFreq", 20}
+};
 
 class Voice
 {
@@ -59,22 +77,14 @@ class Voice
 
     void OnNoteOff() { env_gate_ = false; }
 
-    void SetParam(int ctrlValue, int param, bool midiCC) 
+    void SetParam(int ctrlValue, int param) 
     {
         //Process paramater value changed
         switch(param)
         {
             case 0:
             {
-                if (midiCC){
-                    waveType = ctrlValue;
-                }
-                else
-                {
-                    waveType += ctrlValue;
-                }
-                
-                switch(waveType / 32)
+                switch(ControlPanel[param].value / 32)
                 {
                     case 0:
                         osc_.SetWaveform(osc_.WAVE_SIN);
@@ -92,50 +102,22 @@ class Voice
             }
             case 1:
             {
-                if (midiCC){
-                    ctrlAttack = ctrlValue;
-                }
-                else
-                {
-                    ctrlAttack += ctrlValue;
-                }
-                env_.SetTime(ADENV_SEG_ATTACK, (ctrlAttack / 32.f));
+                env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f));
             }
             break;
             case 2:
             {
-                if (midiCC){
-                    ctrlDecay = ctrlValue;
-                }
-                else
-                {
-                    ctrlDecay += ctrlValue;
-                }
-                env_.SetTime(ADENV_SEG_DECAY, (ctrlDecay / 32.f));
+                env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f));
             }
             break;
             case 3:
             {
-                if (midiCC){
-                    ctrlSustain = ctrlValue;
-                }
-                else
-                {
-                    ctrlSustain += ctrlValue;
-                }
-                env_.SetSustainLevel(ctrlSustain / 127.f);
+                env_.SetSustainLevel(ControlPanel[param].value / 127.f);
             }
             break;
             case 4:
             {
-                if (midiCC){
-                    ctrlRelease = ctrlValue;
-                }
-                else
-                {
-                    ctrlRelease += ctrlValue;
-                }
-                env_.SetTime(ADSR_SEG_RELEASE, (ctrlRelease / 64.f));
+                env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));
             }
             break;
 
@@ -208,11 +190,11 @@ class VoiceManager
         }
     }
 
-    void SetParam(int ctrlValue, int param, bool midiCC)
+    void SetParam(int ctrlValue, int param)
     {
         for(size_t i = 0; i < max_voices; i++)
         {
-            voices[i].SetParam(ctrlValue, param, midiCC);
+            voices[i].SetParam(ctrlValue, param);
         }
     }
 
@@ -236,13 +218,10 @@ class VoiceManager
 
 static VoiceManager<24> mgr;
 static DaisySeed        hw;
-//static Oscillator       osc;
 static Oscillator       lfo;
 static Encoder          enc;
 static MidiUsbHandler   midi;
-//static Adsr             env;
 static MoogLadder       flt;
-//bool                    gate;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
@@ -260,9 +239,18 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
 void HandleControls(int ctrlValue, int param, bool midiCC)
 {
     //Process paramater value changed
+    if (midiCC)
+    {
+        ControlPanel[param].value = ctrlValue;
+    }
+        else
+    {
+        ControlPanel[param].value += ctrlValue;
+    }
+
     if (param < 5)
     {
-        mgr.SetParam(ctrlValue, param, midiCC);
+        mgr.SetParam(ControlPanel[param].value, param);
     }
     else
     {
@@ -270,38 +258,17 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
         {
             case 5:
             {
-                if (midiCC){
-                    ctrlFilterFreq = ctrlValue;
-                }
-                else
-                {
-                    ctrlFilterFreq += ctrlValue;
-                }
-                //flt.SetFreq(ctrlFilterFreq * 174);
+                //flt.SetFreq(ControlPanel[param].value * 174);
             }
             break;
             case 6:
             {
-                if (midiCC){
-                    ctrlFilterRes = ctrlValue;
-                }
-                else
-                {
-                    ctrlFilterRes += ctrlValue;
-                }
-                flt.SetRes(ctrlFilterRes / 134.0f);
+                flt.SetRes(ControlPanel[param].value / 134.0f);
             }
             break;
             case 7:
             {
-                if (midiCC){
-                    ctrlLFOFreq = ctrlValue;
-                }
-                else
-                {
-                    ctrlLFOFreq += ctrlValue;
-                }
-                lfo.SetFreq(ctrlLFOFreq / 6.4f);
+                lfo.SetFreq(ControlPanel[param].value / 6.4f);
             }
             break;
 
