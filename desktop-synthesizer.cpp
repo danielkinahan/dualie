@@ -1,38 +1,28 @@
 #include "daisy_seed.h"
 #include "daisysp.h"
-#include <string>
 
+using namespace std;
 using namespace daisy;
 using namespace daisysp;
 using namespace daisy::seed;
 
-int waveType = 0;
-float ctrlAmp = 0.75;
-int ctrlAttack = 12;
-int ctrlDecay = 30;
-int ctrlSustain = 25;
-int ctrlRelease = 10;
-int ctrlFilterFreq = 100;
-int ctrlFilterRes = 10;
-int ctrlLFOFreq = 20;
-
-struct Control
-{
-    std::string name;
-    int value;
+class Control {
+    public:
+        Control(const string& name, int value) : name(name), value(value) {}
+        string name;
+        int value;
 };
 
-Control ControlPanel[20] = {
+Control ControlPanel[] = {
     {"waveType", 0},
-    {"ctrlAttack", 12},
-    {"ctrlDecay", 30},
-    {"ctrlSustain", 25},
-    {"ctrlRelease", 10},
-    {"ctrlFilterFreq", 100},
-    {"ctrlFilterRes", 10},
-    {"ctrlLFOFreq", 20}
+    {"ctrlAttack", 0},
+    {"ctrlDecay", 0},
+    {"ctrlSustain", 127},
+    {"ctrlRelease", 0},
+    {"ctrlFilterFreq", 127},
+    {"ctrlFilterRes", 0},
+    {"ctrlLFOFreq", 0}
 };
-
 class Voice
 {
   public:
@@ -42,14 +32,19 @@ class Voice
     {
         active_ = false;
         osc_.Init(samplerate);
-        osc_.SetAmp(ctrlAmp);
+        osc_.SetAmp(0.75);
         osc_.SetWaveform(Oscillator::WAVE_SIN);
 
         env_.Init(samplerate);
-        env_.SetTime(ADSR_SEG_ATTACK, ctrlAttack / 32.0f);
-        env_.SetTime(ADSR_SEG_DECAY, ctrlDecay / 32.0f);
-        env_.SetSustainLevel(ctrlSustain / 128.0f);
-        env_.SetTime(ADSR_SEG_RELEASE, ctrlRelease / 64.0f);
+        env_.SetTime(ADSR_SEG_ATTACK, 0);
+        env_.SetTime(ADSR_SEG_DECAY, 0);
+        env_.SetSustainLevel(1);
+        env_.SetTime(ADSR_SEG_RELEASE, 0);
+
+        filt_.Init(samplerate);
+        filt_.SetFreq(samplerate / 3);
+        filt_.SetRes(0);
+        //filt_.SetDrive(0.8f);
     }
 
     float Process()
@@ -61,7 +56,8 @@ class Voice
             if(!env_.IsRunning())
                 active_ = false;
             sig = osc_.Process();
-            return sig * (velocity_ / 127.f) * amp;
+            filt_.Process(sig);
+            return filt_.Low() * (velocity_ / 127.f) * amp;
         }
         return 0.f;
     }
@@ -100,6 +96,7 @@ class Voice
                         break;
                 }
             }
+            break;
             case 1:
             {
                 env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f));
@@ -120,6 +117,18 @@ class Voice
                 env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));
             }
             break;
+            case 5:
+            {
+                //TODO: Change this from linear to logarithmic scaling
+                filt_.SetFreq(ControlPanel[param].value * 174);
+            }
+            break;
+            case 6:
+            {
+                //Awful sounds at values past 0.95!
+                filt_.SetRes(ControlPanel[param].value / 134.0f);
+            }
+            break;
 
             default: break;
         }
@@ -130,6 +139,7 @@ class Voice
 
   private:
     Oscillator osc_;
+    Svf        filt_;
     Adsr       env_;
     float      note_, velocity_;
     bool       active_;
@@ -221,18 +231,13 @@ static DaisySeed        hw;
 static Oscillator       lfo;
 static Encoder          enc;
 static MidiUsbHandler   midi;
-static MoogLadder       flt;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
-    float freq, modulated_freq;
+    //float osc_out, lfo_out;
     for(size_t i = 0; i < size; i++)
     {
-        freq = ctrlFilterFreq * 174;
-        modulated_freq = freq + (lfo.Process() * freq);
-        flt.SetFreq(modulated_freq);
-        
-        out[0][i] = out[1][i] = flt.Process(mgr.Process() * 0.5f);
+        out[0][i] = out[1][i] = mgr.Process() * 0.5f;
     }
 }
 
@@ -248,7 +253,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
         ControlPanel[param].value += ctrlValue;
     }
 
-    if (param < 5)
+    if (param < 7)
     {
         mgr.SetParam(ControlPanel[param].value, param);
     }
@@ -256,16 +261,6 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
     {
         switch(param)
         {
-            case 5:
-            {
-                //flt.SetFreq(ControlPanel[param].value * 174);
-            }
-            break;
-            case 6:
-            {
-                flt.SetRes(ControlPanel[param].value / 134.0f);
-            }
-            break;
             case 7:
             {
                 lfo.SetFreq(ControlPanel[param].value / 6.4f);
@@ -288,20 +283,14 @@ int main(void)
     midi.Init(midi_cfg);
     enc.Init(hw.GetPin(0), hw.GetPin(2), hw.GetPin(1));
     mgr.Init(hw.AudioSampleRate());
-    flt.Init(hw.AudioSampleRate());
     lfo.Init(hw.AudioSampleRate());
 
     int param = 0;
 
-    //TODO: Change this from linear to logarithmic scaling
-    flt.SetFreq(ctrlFilterFreq * 174);
-    //Awful sounds at values past 0.95!
-    flt.SetRes(ctrlFilterRes / 134.0f);
-
     lfo.SetAmp(1);
     lfo.SetWaveform(Oscillator::WAVE_SIN);
     //TODO: Change this from linear to logarithmic scaling
-    lfo.SetFreq(ctrlLFOFreq / 6.4f);
+    lfo.SetFreq(0);
 
     // start the audio callback
     hw.StartAudio(AudioCallback);
