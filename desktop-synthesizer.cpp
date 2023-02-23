@@ -7,52 +7,48 @@ using namespace daisy;
 using namespace daisysp;
 using namespace daisy::seed;
 
-class Control {
-    public:
-        Control(const string& name, int value) : name(name), value(value) {}
-        string name;
-        int value;
-};
+const int ControlPanelSize = 35;
 
-Control ControlPanel[] = {
-    {"Osc1Waveform", 0}, //0
-    {"Osc1PulseWidth", 0},
-    {"Osc1FrequencyMod", 0},
-    {"Osc1PWMod", 0},
-    {"Osc2Waveform", 0},
-    {"Osc2PulseWidth", 0}, //5
-    {"Osc2FrequencyMod", 0},
-    {"Osc2PWMod", 0},
-    {"Osc2TuneCents", 0},
-    {"Osc2TuneOctave", 0},
-    {"Osc2Sync", 0}, //10
-    {"Noise", 0},
-    {"OscMix", 64},
-    {"OscSplit", 0},
-    {"FilterCutoff", 127},
-    {"FilterResonance", 0}, //15
-    {"FilterLFOMod", 0},
-    {"FilterVelocityMod", 0},
-    {"FilterKeybedTrack", 0},
-    {"FilterAttack", 0},
-    {"FilterDecay", 0}, //20
-    {"FilterSustain", 127},
-    {"FilterRelease", 0},
-    {"AmpAttack", 0},
-    {"AmpDecay", 0},
-    {"AmpSustain", 127}, //25
-    {"AmpRelease", 0},
-    {"AmpLFOMod", 0},
-    {"LFOWaveform", 0},
-    {"LFOFrequency", 0},
-    {"LFOTempoSync", 0}, //30
-    {"FXType", 0},
-    {"FXParam1", 0},
-    {"FXParam2", 0},
-    {"FXMix", 0} //34
+int ControlPanel[ControlPanelSize] = {
+    0, // Osc1Waveform
+    0, // Osc1PulseWidth
+    0, // Osc1FrequencyMod
+    0, // Osc1PWMod
+    0, // Osc2Waveform
+    0, // Osc2PulseWidth
+    0, // Osc2FrequencyMod
+    0, // Osc2PWMod
+    0, // Osc2TuneCents
+    0, // Osc2TuneOctave
+    0, // Osc2Sync
+    0, // Noise
+    64, // OscMix
+    0, // OscSplit
+    127, // FilterCutoff
+    0, // FilterResonance
+    0, // FilterLFOMod
+    0, // FilterVelocityMod
+    0, // FilterKeybedTrack
+    0, // FilterAttack
+    0, // FilterDecay
+    127, // FilterSustain
+    0, // FilterRelease
+    0, // AmpAttack
+    0, // AmpDecay
+    127, // AmpSustain
+    0, // AmpRelease
+    0, // AmpLFOMod
+    0, // LFOWaveform
+    0, // LFOFrequency
+    0, // LFOTempoSync
+    0, // FXType
+    0, // FXParam1
+    0, // FXParam2
+    0 // FXMix
+};
     //Don't think I need to add preset controls here
     //TODO: Map the params to meaningful indeces of MIDI CC
-};
+
 class Voice
 {
   public:
@@ -109,13 +105,13 @@ class Voice
 
     void OnNoteOff() { env_gate_ = false; }
 
-    void SetParam(int ctrlValue, int param) 
+    void SetParam(int param) 
     {
         //Process paramater value changed
         switch(param)
         {
-            case 0:
-                switch(ControlPanel[param].value / 32)
+            case CTRL_OSC1WAVEFORM:
+                switch(ControlPanel[CTRL_OSC1WAVEFORM] / 32)
                 {
                     case 0: osc1_.SetWaveform(osc1_.WAVE_SIN); break;
                     case 1: osc1_.SetWaveform(osc1_.WAVE_TRI); break;
@@ -124,15 +120,15 @@ class Voice
                     default: break;
                 }
             break;
-            case 23: amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f)); break;
-            case 24: amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f)); break;
+            case CTRL_AMPATTACK: amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[CTRL_AMPATTACK] / 32.f)); break;
+            case CTRL_AMPDECAY: amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[CTRL_AMPDECAY] / 32.f)); break;
             // Stops working after sustain set to 0 and reset
-            case 25: amp_env_.SetSustainLevel(ControlPanel[param].value / 127.f); break;
-            case 26: amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));break;
+            case CTRL_AMPSUSTAIN: amp_env_.SetSustainLevel(ControlPanel[CTRL_AMPSUSTAIN] / 127.f); break;
+            case CTRL_AMPRELEASE: amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[CTRL_AMPRELEASE] / 64.f));break;
             //TODO: Change this from linear to logarithmic scaling
-            case 14: filt_.SetFreq(ControlPanel[param].value * 174); break;
+            case CTRL_FILTERCUTOFF: filt_.SetFreq(ControlPanel[CTRL_FILTERCUTOFF] * 174); break;
             //Awful sounds at values past 0.95!
-            case 15: filt_.SetRes(ControlPanel[param].value / 134.0f); break;
+            case CTRL_FILTERRESONANCE: filt_.SetRes(ControlPanel[CTRL_FILTERRESONANCE] / 134.0f); break;
             default: break;
         }
     }
@@ -205,11 +201,11 @@ class VoiceManager
         }
     }
 
-    void SetParam(int ctrlValue, int param)
+    void SetParam(int param)
     {
         for(size_t i = 0; i < max_voices; i++)
         {
-            voices[i].SetParam(ctrlValue, param);
+            voices[i].SetParam(param);
         }
     }
 
@@ -251,24 +247,24 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
     //Process paramater value changed
     if (midiCC)
     {
-        ControlPanel[param].value = ctrlValue;
+        ControlPanel[param] = ctrlValue;
     }
         else
     {
-        ControlPanel[param].value += ctrlValue;
+        ControlPanel[param] += ctrlValue;
     }
 
     if (param < 7)
     {
-        mgr.SetParam(ControlPanel[param].value, param);
+        mgr.SetParam(param);
     }
     else
     {
         switch(param)
         {
-            case 7:
+            case CTRL_LFOFREQUENCY:
             {
-                lfo.SetFreq(ControlPanel[param].value / 6.4f);
+                lfo.SetFreq(ControlPanel[CTRL_LFOFREQUENCY] / 6.4f);
             }
             break;
 
