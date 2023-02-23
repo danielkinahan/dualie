@@ -1,5 +1,6 @@
 #include "daisy_seed.h"
 #include "daisysp.h"
+#include "desktop-synthesizer.h"
 
 using namespace std;
 using namespace daisy;
@@ -14,14 +15,43 @@ class Control {
 };
 
 Control ControlPanel[] = {
-    {"waveType", 0},
-    {"ctrlAttack", 0},
-    {"ctrlDecay", 0},
-    {"ctrlSustain", 127},
-    {"ctrlRelease", 0},
-    {"ctrlFilterFreq", 127},
-    {"ctrlFilterRes", 0},
-    {"ctrlLFOFreq", 0}
+    {"Osc1Waveform", 0}, //0
+    {"Osc1PulseWidth", 0},
+    {"Osc1FrequencyMod", 0},
+    {"Osc1PWMod", 0},
+    {"Osc2Waveform", 0},
+    {"Osc2PulseWidth", 0}, //5
+    {"Osc2FrequencyMod", 0},
+    {"Osc2PWMod", 0},
+    {"Osc2TuneCents", 0},
+    {"Osc2TuneOctave", 0},
+    {"Osc2Sync", 0}, //10
+    {"Noise", 0},
+    {"OscMix", 64},
+    {"OscSplit", 0},
+    {"FilterCutoff", 127},
+    {"FilterResonance", 0}, //15
+    {"FilterLFOMod", 0},
+    {"FilterVelocityMod", 0},
+    {"FilterKeybedTrack", 0},
+    {"FilterAttack", 0},
+    {"FilterDecay", 0}, //20
+    {"FilterSustain", 127},
+    {"FilterRelease", 0},
+    {"AmpAttack", 0},
+    {"AmpDecay", 0},
+    {"AmpSustain", 127}, //25
+    {"AmpRelease", 0},
+    {"AmpLFOMod", 0},
+    {"LFOWaveform", 0},
+    {"LFOFrequency", 0},
+    {"LFOTempoSync", 0}, //30
+    {"FXType", 0},
+    {"FXParam1", 0},
+    {"FXParam2", 0},
+    {"FXMix", 0} //34
+    //Don't think I need to add preset controls here
+    //TODO: Map the params to meaningful indeces of MIDI CC
 };
 class Voice
 {
@@ -31,15 +61,21 @@ class Voice
     void Init(float samplerate)
     {
         active_ = false;
-        osc_.Init(samplerate);
-        osc_.SetAmp(0.75);
-        osc_.SetWaveform(Oscillator::WAVE_SIN);
+        osc1_.Init(samplerate);
+        osc1_.SetAmp(0.5);
+        osc1_.SetWaveform(Oscillator::WAVE_SIN);
+        osc1_.SetPw(0.5);
 
-        env_.Init(samplerate);
-        env_.SetTime(ADSR_SEG_ATTACK, 0);
-        env_.SetTime(ADSR_SEG_DECAY, 0);
-        env_.SetSustainLevel(1);
-        env_.SetTime(ADSR_SEG_RELEASE, 0);
+        osc2_.Init(samplerate);
+        osc2_.SetAmp(0.5);
+        osc2_.SetWaveform(Oscillator::WAVE_SIN);
+        osc2_.SetPw(0.5);
+
+        amp_env_.Init(samplerate);
+        amp_env_.SetTime(ADSR_SEG_ATTACK, 0);
+        amp_env_.SetTime(ADSR_SEG_DECAY, 0);
+        amp_env_.SetSustainLevel(1);
+        amp_env_.SetTime(ADSR_SEG_RELEASE, 0);
 
         filt_.Init(samplerate);
         filt_.SetFreq(samplerate / 3);
@@ -52,10 +88,10 @@ class Voice
         if(active_)
         {
             float sig, amp;
-            amp = env_.Process(env_gate_);
-            if(!env_.IsRunning())
+            amp = amp_env_.Process(env_gate_); //change to account for both envelopes
+            if(!amp_env_.IsRunning())
                 active_ = false;
-            sig = osc_.Process();
+            sig = osc1_.Process(); //add other oscillator
             filt_.Process(sig);
             return filt_.Low() * (velocity_ / 127.f) * amp;
         }
@@ -66,7 +102,7 @@ class Voice
     {
         note_     = note;
         velocity_ = velocity;
-        osc_.SetFreq(mtof(note_));
+        osc1_.SetFreq(mtof(note_));
         active_   = true;
         env_gate_ = true;
     }
@@ -81,21 +117,22 @@ class Voice
             case 0:
                 switch(ControlPanel[param].value / 32)
                 {
-                    case 0: osc_.SetWaveform(osc_.WAVE_SIN); break;
-                    case 1: osc_.SetWaveform(osc_.WAVE_TRI); break;
-                    case 2: osc_.SetWaveform(osc_.WAVE_SAW); break;
-                    case 3: osc_.SetWaveform(osc_.WAVE_SQUARE); break;
+                    case 0: osc1_.SetWaveform(osc1_.WAVE_SIN); break;
+                    case 1: osc1_.SetWaveform(osc1_.WAVE_TRI); break;
+                    case 2: osc1_.SetWaveform(osc1_.WAVE_SAW); break;
+                    case 3: osc1_.SetWaveform(osc1_.WAVE_SQUARE); break;
                     default: break;
                 }
             break;
-            case 1: env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f)); break;
-            case 2: env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f)); break;
-            case 3: env_.SetSustainLevel(ControlPanel[param].value / 127.f); break;
-            case 4: env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));break;
+            case 23: amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[param].value / 32.f)); break;
+            case 24: amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[param].value / 32.f)); break;
+            // Stops working after sustain set to 0 and reset
+            case 25: amp_env_.SetSustainLevel(ControlPanel[param].value / 127.f); break;
+            case 26: amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[param].value / 64.f));break;
             //TODO: Change this from linear to logarithmic scaling
-            case 5: filt_.SetFreq(ControlPanel[param].value * 174); break;
+            case 14: filt_.SetFreq(ControlPanel[param].value * 174); break;
             //Awful sounds at values past 0.95!
-            case 6: filt_.SetRes(ControlPanel[param].value / 134.0f); break;
+            case 15: filt_.SetRes(ControlPanel[param].value / 134.0f); break;
             default: break;
         }
     }
@@ -104,9 +141,11 @@ class Voice
     inline float GetNote() const { return note_; }
 
   private:
-    Oscillator osc_;
+    Oscillator osc1_;
+    Oscillator osc2_;
     Svf        filt_;
-    Adsr       env_;
+    Adsr       filt_env_;
+    Adsr       amp_env_;
     float      note_, velocity_;
     bool       active_;
     bool       env_gate_;
