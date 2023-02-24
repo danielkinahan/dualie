@@ -7,6 +7,8 @@ using namespace daisy;
 using namespace daisysp;
 using namespace daisy::seed;
 
+static Oscillator       lfo;
+
 const int ControlPanelSize = 35;
 
 int ControlPanel[ControlPanelSize] = {
@@ -59,23 +61,23 @@ class Voice
         active_ = false;
         osc1_.Init(samplerate);
         osc1_.SetAmp(0.5);
-        osc1_.SetWaveform(Oscillator::WAVE_SIN);
-        osc1_.SetPw(0.5);
+        osc1_.SetWaveform(ControlPanel[CTRL_OSC1WAVEFORM] / 16);
+        osc1_.SetPw(ControlPanel[CTRL_OSC1PULSEWIDTH] / 254.f);
 
         osc2_.Init(samplerate);
         osc2_.SetAmp(0.5);
-        osc2_.SetWaveform(Oscillator::WAVE_SIN);
-        osc2_.SetPw(0.5);
+        osc2_.SetWaveform(ControlPanel[CTRL_OSC2WAVEFORM] / 16);
+        osc2_.SetPw(ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f);
 
         amp_env_.Init(samplerate);
-        amp_env_.SetTime(ADSR_SEG_ATTACK, 0);
-        amp_env_.SetTime(ADSR_SEG_DECAY, 0);
-        amp_env_.SetSustainLevel(1);
-        amp_env_.SetTime(ADSR_SEG_RELEASE, 0);
+        amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[CTRL_AMPATTACK] / 32.f));
+        amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[CTRL_AMPDECAY] / 32.f));
+        amp_env_.SetSustainLevel(ControlPanel[CTRL_AMPSUSTAIN] / 127.f);
+        amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[CTRL_AMPRELEASE] / 64.f));
 
         filt_.Init(samplerate);
-        filt_.SetFreq(samplerate / 3);
-        filt_.SetRes(0);
+        filt_.SetFreq(ControlPanel[CTRL_FILTERCUTOFF] * 174);
+        filt_.SetRes(ControlPanel[CTRL_FILTERRESONANCE] / 134.0f);
         //filt_.SetDrive(0.8f);
     }
 
@@ -83,10 +85,13 @@ class Voice
     {
         if(active_)
         {
-            float sig, amp;
+            float sig, amp, pw, pwMod;
             amp = amp_env_.Process(env_gate_); //change to account for both envelopes
             if(!amp_env_.IsRunning())
                 active_ = false;
+            pw = ControlPanel[CTRL_OSC1PULSEWIDTH] / 254.f;
+            pwMod = ControlPanel[CTRL_OSC1PWMOD] / 127.f;
+            osc1_.SetPw(pw + (lfo.Process() * pwMod * (0.5-pw)));
             sig = osc1_.Process(); //add other oscillator
             filt_.Process(sig);
             return filt_.Low() * (velocity_ / 127.f) * amp;
@@ -110,21 +115,12 @@ class Voice
         //Process paramater value changed
         switch(param)
         {
-            case CTRL_OSC1WAVEFORM:
-                switch(ControlPanel[CTRL_OSC1WAVEFORM] / 32)
-                {
-                    case 0: osc1_.SetWaveform(osc1_.WAVE_SIN); break;
-                    case 1: osc1_.SetWaveform(osc1_.WAVE_TRI); break;
-                    case 2: osc1_.SetWaveform(osc1_.WAVE_SAW); break;
-                    case 3: osc1_.SetWaveform(osc1_.WAVE_SQUARE); break;
-                    default: break;
-                }
-            break;
+            case CTRL_OSC1WAVEFORM: osc1_.SetWaveform(ControlPanel[CTRL_OSC1WAVEFORM] / 16); break;
             case CTRL_AMPATTACK: amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[CTRL_AMPATTACK] / 32.f)); break;
             case CTRL_AMPDECAY: amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[CTRL_AMPDECAY] / 32.f)); break;
             // Stops working after sustain set to 0 and reset
             case CTRL_AMPSUSTAIN: amp_env_.SetSustainLevel(ControlPanel[CTRL_AMPSUSTAIN] / 127.f); break;
-            case CTRL_AMPRELEASE: amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[CTRL_AMPRELEASE] / 64.f));break;
+            case CTRL_AMPRELEASE: amp_env_.SetTime(ADSR_SEG_RELEASE, (ControlPanel[CTRL_AMPRELEASE] / 64.f)); break;
             //TODO: Change this from linear to logarithmic scaling
             case CTRL_FILTERCUTOFF: filt_.SetFreq(ControlPanel[CTRL_FILTERCUTOFF] * 174); break;
             //Awful sounds at values past 0.95!
@@ -229,7 +225,6 @@ class VoiceManager
 
 static VoiceManager<24> mgr;
 static DaisySeed        hw;
-static Oscillator       lfo;
 static Encoder          enc;
 static MidiUsbHandler   midi;
 
@@ -254,7 +249,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
         ControlPanel[param] += ctrlValue;
     }
 
-    if (param < 7)
+    if (param < 27)
     {
         mgr.SetParam(param);
     }
