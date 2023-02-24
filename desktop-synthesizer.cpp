@@ -1,6 +1,7 @@
 #include "daisy_seed.h"
 #include "daisysp.h"
 #include "desktop-synthesizer.h"
+#include<cmath>
 
 using namespace std;
 using namespace daisy;
@@ -85,7 +86,7 @@ class Voice
     {
         if(active_)
         {
-            float sig, amp, lfo_out, pw1, pwMod1, fMod1, pw2, pwMod2, fMod2;
+            float sig, amp, lfo_out, pw1, pwMod1, fMod1, pw2, pwMod2, fMod2, freq2, cents, semitones;
             amp = amp_env_.Process(env_gate_); //change to account for both envelopes
             if(!amp_env_.IsRunning())
                 active_ = false;
@@ -97,12 +98,21 @@ class Voice
             fMod1 = ControlPanel[CTRL_OSC1FREQUENCYMOD] / 127.f; //change the scaling on this
             osc1_.PhaseAdd(lfo_out * fMod1);
 
+            semitones = (int) (ControlPanel[CTRL_OSC2TUNECOARSE] / 3.5f);
+            cents = ControlPanel[CTRL_OSC2TUNEFINE];
+
+            /*formula for adding cents to frequency is
+                b = a * 2^(n/1200)
+            */
+            freq2 = mtof(note_ - semitones) * std::pow(2, (cents/1200));
+            osc2_.SetFreq(freq2);
+
             pw2 = ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f;
             pwMod2 = ControlPanel[CTRL_OSC2PWMOD] / 127.f;
             osc2_.SetPw(pw2 + (lfo_out * pwMod2 * (0.5-pw2)));
             fMod2 = ControlPanel[CTRL_OSC2FREQUENCYMOD] / 127.f; //change the scaling on this
             osc2_.PhaseAdd(lfo_out * fMod2);
-            
+
             sig = osc1_.Process() + osc2_.Process(); //add other oscillator
             filt_.Process(sig);
             return filt_.Low() * (velocity_ / 127.f) * amp;
@@ -151,7 +161,7 @@ class Voice
     Svf        filt_;
     Adsr       filt_env_;
     Adsr       amp_env_;
-    float      note_, velocity_;
+    uint8_t    note_, velocity_;
     bool       active_;
     bool       env_gate_;
 };
