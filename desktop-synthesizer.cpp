@@ -85,17 +85,25 @@ class Voice
     {
         if(active_)
         {
-            float sig, amp, pw, pwMod, fMod, lfo_out;
+            float sig, amp, lfo_out, pw1, pwMod1, fMod1, pw2, pwMod2, fMod2;
             amp = amp_env_.Process(env_gate_); //change to account for both envelopes
             if(!amp_env_.IsRunning())
                 active_ = false;
-            pw = ControlPanel[CTRL_OSC1PULSEWIDTH] / 254.f;
-            pwMod = ControlPanel[CTRL_OSC1PWMOD] / 127.f;
             lfo_out = lfo.Process();
-            osc1_.SetPw(pw + (lfo_out * pwMod * (0.5-pw)));
-            fMod = ControlPanel[CTRL_OSC1FREQUENCYMOD] / 127.f; //change the scaling on this
-            osc1_.PhaseAdd(lfo_out * fMod);
-            sig = osc1_.Process(); //add other oscillator
+
+            pw1 = ControlPanel[CTRL_OSC1PULSEWIDTH] / 254.f;
+            pwMod1 = ControlPanel[CTRL_OSC1PWMOD] / 127.f;
+            osc1_.SetPw(pw1 + (lfo_out * pwMod1 * (0.5-pw1)));
+            fMod1 = ControlPanel[CTRL_OSC1FREQUENCYMOD] / 127.f; //change the scaling on this
+            osc1_.PhaseAdd(lfo_out * fMod1);
+
+            pw2 = ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f;
+            pwMod2 = ControlPanel[CTRL_OSC2PWMOD] / 127.f;
+            osc2_.SetPw(pw2 + (lfo_out * pwMod2 * (0.5-pw2)));
+            fMod2 = ControlPanel[CTRL_OSC2FREQUENCYMOD] / 127.f; //change the scaling on this
+            osc2_.PhaseAdd(lfo_out * fMod2);
+            
+            sig = osc1_.Process() + osc2_.Process(); //add other oscillator
             filt_.Process(sig);
             return filt_.Low() * (velocity_ / 127.f) * amp;
         }
@@ -107,6 +115,7 @@ class Voice
         note_     = note;
         velocity_ = velocity;
         osc1_.SetFreq(mtof(note_));
+        osc2_.SetFreq(mtof(note_));
         active_   = true;
         env_gate_ = true;
     }
@@ -119,6 +128,7 @@ class Voice
         switch(param)
         {
             case CTRL_OSC1WAVEFORM: osc1_.SetWaveform(ControlPanel[CTRL_OSC1WAVEFORM] / 16); break;
+            case CTRL_OSC2WAVEFORM: osc2_.SetWaveform(ControlPanel[CTRL_OSC2WAVEFORM] / 16); break;
             case CTRL_AMPATTACK: amp_env_.SetTime(ADENV_SEG_ATTACK, (ControlPanel[CTRL_AMPATTACK] / 32.f)); break;
             case CTRL_AMPDECAY: amp_env_.SetTime(ADENV_SEG_DECAY, (ControlPanel[CTRL_AMPDECAY] / 32.f)); break;
             // Stops working after sustain set to 0 and reset
