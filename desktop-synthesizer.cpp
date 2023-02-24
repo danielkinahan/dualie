@@ -13,11 +13,11 @@ const int ControlPanelSize = 35;
 
 int ControlPanel[ControlPanelSize] = {
     0, // Osc1Waveform
-    0, // Osc1PulseWidth
+    127, // Osc1PulseWidth
     0, // Osc1FrequencyMod
     0, // Osc1PWMod
     0, // Osc2Waveform
-    0, // Osc2PulseWidth
+    127, // Osc2PulseWidth
     0, // Osc2FrequencyMod
     0, // Osc2PWMod
     0, // Osc2TuneCents
@@ -85,13 +85,16 @@ class Voice
     {
         if(active_)
         {
-            float sig, amp, pw, pwMod;
+            float sig, amp, pw, pwMod, fMod, lfo_out;
             amp = amp_env_.Process(env_gate_); //change to account for both envelopes
             if(!amp_env_.IsRunning())
                 active_ = false;
             pw = ControlPanel[CTRL_OSC1PULSEWIDTH] / 254.f;
             pwMod = ControlPanel[CTRL_OSC1PWMOD] / 127.f;
-            osc1_.SetPw(pw + (lfo.Process() * pwMod * (0.5-pw)));
+            lfo_out = lfo.Process();
+            osc1_.SetPw(pw + (lfo_out * pwMod * (0.5-pw)));
+            fMod = ControlPanel[CTRL_OSC1FREQUENCYMOD] / 127.f; //change the scaling on this
+            osc1_.PhaseAdd(lfo_out * fMod);
             sig = osc1_.Process(); //add other oscillator
             filt_.Process(sig);
             return filt_.Low() * (velocity_ / 127.f) * amp;
