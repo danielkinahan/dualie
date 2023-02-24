@@ -10,9 +10,9 @@ using namespace daisy::seed;
 
 static Oscillator       lfo;
 
-const int ControlPanelSize = 35;
+const uint8_t ControlPanelSize = 35;
 
-int ControlPanel[ControlPanelSize] = {
+uint8_t ControlPanel[ControlPanelSize] = {
     0, // Osc1Waveform
     127, // Osc1PulseWidth
     0, // Osc1FrequencyMod
@@ -192,7 +192,7 @@ class VoiceManager
         return sum;
     }
 
-    void OnNoteOn(float notenumber, float velocity)
+    void OnNoteOn(uint8_t notenumber, uint8_t velocity)
     {
         Voice *v = FindFreeVoice();
         if(v == NULL)
@@ -200,7 +200,7 @@ class VoiceManager
         v->OnNoteOn(notenumber, velocity);
     }
 
-    void OnNoteOff(float notenumber, float velocity)
+    void OnNoteOff(uint8_t notenumber, uint8_t velocity)
     {
         for(size_t i = 0; i < max_voices; i++)
         {
@@ -304,7 +304,7 @@ int main(void)
     mgr.Init(hw.AudioSampleRate());
     lfo.Init(hw.AudioSampleRate());
 
-    int param = 0;
+    uint8_t param = 0;
 
     lfo.SetAmp(1);
     lfo.SetWaveform(Oscillator::WAVE_SIN);
@@ -320,7 +320,7 @@ int main(void)
         if(enc.Pressed())
         {
             param++;
-            if (param >= 4){
+            if (param >= 35){
                 param = 0;
             }
             hw.DelayMs(300);
