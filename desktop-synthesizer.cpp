@@ -127,42 +127,37 @@ class Voice
         {
             return 0.f;
         }
-        float sig, amp, lfo_out;
+        float sig, amp, vel, lfo_out;
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())
             active_ = false;
+        vel = velocity_ / 127.f;
         lfo_out = lfo.Process();
 
         //amp should be set through the function
-        //osc1_.SetAmp(amp);
+        osc1_.SetAmp(vel * (1-ValuePanel[CTRL_OSCMIX]));
         osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
                         + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
                         * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
-
         //Not sure if phaseAdd is the best way to do frequency modulation
         osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
 
-        osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
-
-        //osc2_.SetAmp(amp);
+        osc2_.SetAmp(vel * ValuePanel[CTRL_OSCMIX]);
         osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
                         + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
                         * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
+        osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
         osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
-
         if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
         {
             osc2_.Reset();
         }
 
-        noise_.SetAmp(amp);
+        noise_.SetAmp(vel * ValuePanel[CTRL_NOISE]);
 
-        sig = (osc1_.Process() * (1-ValuePanel[CTRL_OSCMIX]))
-            + (osc2_.Process() * ValuePanel[CTRL_OSCMIX])
-            + (noise_.Process() * ValuePanel[CTRL_NOISE]);
-
-        filt_.Process(sig);
-        return filt_.Low() * (velocity_ / 127.f) * amp;
+        sig = osc1_.Process() + osc2_.Process() + noise_.Process();
+        filt_.Process(sig * amp);
+        return filt_.Low();
     }
 
     void OnNoteOn(uint8_t note, uint8_t velocity)
