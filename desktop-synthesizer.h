@@ -9,7 +9,7 @@
 #define CTRL_OSC2TUNEFINE 8
 #define CTRL_OSC2TUNECOARSE 9
 #define CTRL_OSC2SYNC 10
-#define CTRL_NOISE 11
+#define CTRL_NOISE 11 //skipped for now
 #define CTRL_OSCMIX 12
 #define CTRL_OSCSPLIT 13
 #define CTRL_FILTERCUTOFF 14
