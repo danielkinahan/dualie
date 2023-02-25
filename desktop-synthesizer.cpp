@@ -134,15 +134,22 @@ class Voice
             osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
                             + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
                             * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
+
+            //Not sure if phaseAdd is the best way to do frequency modulation
             osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
 
             osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
 
-            //osc1_.SetAmp(amp);
+            //osc2_.SetAmp(amp);
             osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
                             + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
                             * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
             osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
+
+            if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
+            {
+                osc2_.Reset();
+            }
 
             sig = (osc1_.Process() * (1-ValuePanel[CTRL_OSCMIX])) + (osc2_.Process() * ValuePanel[CTRL_OSCMIX]);
             filt_.Process(sig);
@@ -203,6 +210,8 @@ class Voice
             case CTRL_OSC2TUNECOARSE:
                 ValuePanel[CTRL_OSC2TUNECOARSE] = ((int) (ControlPanel[CTRL_OSC2TUNECOARSE] / 2.646)) - 24.18; //semitones
                 break;
+            case CTRL_OSC2SYNC:
+                ValuePanel[CTRL_OSC2SYNC] = ControlPanel[CTRL_OSC2SYNC] ? 1 : 0;
             case CTRL_OSCMIX:
                 ValuePanel[CTRL_OSCMIX] = ControlPanel[CTRL_OSCMIX] / 127.f;
             case CTRL_AMPATTACK:
