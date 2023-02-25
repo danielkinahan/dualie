@@ -131,31 +131,43 @@ class Voice
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())
             active_ = false;
+
+        //Look into removing this divison and storing floats inside the Voice object
         vel = velocity_ / 127.f;
         lfo_out = lfo.Process();
 
-        //amp should be set through the function
-        osc1_.SetAmp(vel * (1-ValuePanel[CTRL_OSCMIX]));
-        osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
-                        + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
-                        * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
-        //Not sure if phaseAdd is the best way to do frequency modulation
-        osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
+        osc1_.SetAmp(0);
+        osc2_.SetAmp(0);
 
-        osc2_.SetAmp(vel * ValuePanel[CTRL_OSCMIX]);
-        osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
-                        + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
-                        * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
-        osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
-        osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
-        if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
+        if (!ValuePanel[CTRL_OSCSPLIT] || note_ < 64 )
         {
-            osc2_.Reset();
+            osc1_.SetAmp(vel * (1-ValuePanel[CTRL_OSCMIX]));
+            osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
+                            + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
+                            * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
+            //Not sure if phaseAdd is the best way to do frequency modulation
+            osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
+        }
+
+        if (!ValuePanel[CTRL_OSCSPLIT] || note_ > 63 )
+        {
+            osc2_.SetAmp(vel * ValuePanel[CTRL_OSCMIX]);
+            osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
+                            + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
+                            * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
+            osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
+            osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
+            if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
+            {
+                osc2_.Reset();
+            }
         }
 
         noise_.SetAmp(vel * ValuePanel[CTRL_NOISE]);
 
         sig = osc1_.Process() + osc2_.Process() + noise_.Process();
+
+        filt_.SetFreq();
         filt_.Process(sig * amp);
         return filt_.Low();
     }
@@ -220,6 +232,9 @@ class Voice
                 break;
             case CTRL_OSCMIX:
                 ValuePanel[CTRL_OSCMIX] = ControlPanel[CTRL_OSCMIX] / 127.f;
+            case CTRL_OSCSPLIT:
+                ValuePanel[CTRL_OSCSPLIT] = ControlPanel[CTRL_OSCSPLIT] ? 1 : 0;
+                break;
             case CTRL_AMPATTACK:
                 ValuePanel[CTRL_AMPATTACK] = ControlPanel[CTRL_AMPATTACK] / 32.f;
                 amp_env_.SetTime(ADENV_SEG_ATTACK, (ValuePanel[CTRL_AMPATTACK])); 
@@ -228,7 +243,6 @@ class Voice
                 ValuePanel[CTRL_AMPDECAY] = ControlPanel[CTRL_AMPDECAY] / 32.f;
                 amp_env_.SetTime(ADENV_SEG_DECAY, (ValuePanel[CTRL_AMPDECAY])); 
                 break;
-            // Stops working after sustain set to 0 and reset
             case CTRL_AMPSUSTAIN:
                 ValuePanel[CTRL_AMPSUSTAIN] = ControlPanel[CTRL_AMPSUSTAIN] / 127.f;
                 amp_env_.SetSustainLevel(ValuePanel[CTRL_AMPSUSTAIN]); 
@@ -356,7 +370,7 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
     //float osc_out, lfo_out;
     for(size_t i = 0; i < size; i++)
     {
-        out[0][i] = out[1][i] = mgr.Process() * 0.5f;
+        out[0][i] = out[1][i] = mgr.Process() * 0.3f;
     }
 }
 
