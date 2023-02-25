@@ -35,10 +35,10 @@ uint8_t ControlPanel[35] = {
     0, // FilterDecay
     127, // FilterSustain
     0, // FilterRelease
-    1, // AmpAttack
-    0, // AmpDecay
+    2, // AmpAttack
+    2, // AmpDecay
     127, // AmpSustain
-    0, // AmpRelease
+    2, // AmpRelease
     0, // AmpLFOMod
     0, // LFOWaveform
     0, // LFOFrequency
@@ -76,10 +76,10 @@ float ValuePanel[35] = {
     0, // FilterDecay
     1, // FilterSustain
     0, // FilterRelease
-    0, // AmpAttack
-    0, // AmpDecay
+    0.0625, // AmpAttack
+    0.0625, // AmpDecay
     1, // AmpSustain
-    0, // AmpRelease
+    0.0625, // AmpRelease
     0, // AmpLFOMod
     0, // LFOWaveform
     0, // LFOFrequency
@@ -98,12 +98,10 @@ class Voice
     {
         active_ = false;
         osc1_.Init(samplerate);
-        osc1_.SetAmp(0.5);
         osc1_.SetWaveform(ValuePanel[CTRL_OSC1WAVEFORM]);
         osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH]);
 
         osc2_.Init(samplerate);
-        osc2_.SetAmp(0.5);
         osc2_.SetWaveform(ValuePanel[CTRL_OSC2WAVEFORM]);
         osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH]);
 
@@ -125,15 +123,13 @@ class Voice
     {
         if(!active_)
         {
-            return 0.f;
+            return 0;
         }
-        float sig, amp, vel, lfo_out;
+        float sig, amp, lfo_out;
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())
             active_ = false;
 
-        //Look into removing this divison and storing floats inside the Voice object
-        vel = velocity_ / 127.f;
         lfo_out = lfo.Process();
 
         osc1_.SetAmp(0);
@@ -141,7 +137,7 @@ class Voice
 
         if (!ValuePanel[CTRL_OSCSPLIT] || note_ < 64 )
         {
-            osc1_.SetAmp(vel * (1-ValuePanel[CTRL_OSCMIX]));
+            osc1_.SetAmp(velocity_ * (1-ValuePanel[CTRL_OSCMIX]));
             osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
                             + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
                             * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
@@ -151,7 +147,7 @@ class Voice
 
         if (!ValuePanel[CTRL_OSCSPLIT] || note_ > 63 )
         {
-            osc2_.SetAmp(vel * ValuePanel[CTRL_OSCMIX]);
+            osc2_.SetAmp(velocity_ * ValuePanel[CTRL_OSCMIX]);
             osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
                             + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
                             * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
@@ -163,19 +159,17 @@ class Voice
             }
         }
 
-        noise_.SetAmp(vel * ValuePanel[CTRL_NOISE]);
+        noise_.SetAmp(velocity_ * ValuePanel[CTRL_NOISE]);
 
         sig = osc1_.Process() + osc2_.Process() + noise_.Process();
 
-        filt_.SetFreq();
-        filt_.Process(sig * amp);
-        return filt_.Low();
+        return filt_.Process(sig * amp);
     }
 
     void OnNoteOn(uint8_t note, uint8_t velocity)
     {
         note_     = note;
-        velocity_ = velocity;
+        velocity_ = velocity / 127.f;
         osc1_.SetFreq(mtof(note_));
         osc2_.SetFreq(mtof(note_));
         active_   = true;
@@ -251,9 +245,9 @@ class Voice
                 ValuePanel[CTRL_AMPRELEASE] = ControlPanel[CTRL_AMPRELEASE] / 64.f;
                 amp_env_.SetTime(ADSR_SEG_RELEASE, ValuePanel[CTRL_AMPRELEASE]); 
                 break;
-            //TODO: Change this from linear to logarithmic scaling
+            //Use a Michaelis-Menten equation to scale frequency y = (-606.0853*x)/(-130.4988 + x)
             case CTRL_FILTERCUTOFF: 
-                ValuePanel[CTRL_FILTERCUTOFF] = ControlPanel[CTRL_FILTERCUTOFF] * 174;
+                ValuePanel[CTRL_FILTERCUTOFF] = (ControlPanel[CTRL_FILTERCUTOFF] * -606.0853) / (ControlPanel[CTRL_FILTERCUTOFF] - 130.4988);
                 filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]); 
                 break;
             //Awful sounds at values past 0.95!
@@ -272,10 +266,11 @@ class Voice
     Oscillator osc1_;
     Oscillator osc2_;
     WhiteNoise noise_;
-    Svf        filt_;
+    MoogLadder filt_;
     Adsr       filt_env_;
     Adsr       amp_env_;
-    uint8_t    note_, velocity_;
+    uint8_t    note_;
+    float      velocity_;
     bool       active_;
     bool       env_gate_;
 };
@@ -342,6 +337,19 @@ class VoiceManager
         }
     }
 
+    uint8_t GetNumActiveVoices()
+    {
+        uint8_t count = 0;
+        for(size_t i = 0; i < max_voices; i++)
+        {
+            if(voices[i].IsActive())
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
 
   private:
     Voice  voices[max_voices];
@@ -360,17 +368,16 @@ class VoiceManager
     }
 };
 
-static VoiceManager<24> mgr;
+static VoiceManager<6> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
 static MidiUsbHandler   midi;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
-    //float osc_out, lfo_out;
     for(size_t i = 0; i < size; i++)
     {
-        out[0][i] = out[1][i] = mgr.Process() * 0.3f;
+        out[0][i] = out[1][i] = mgr.Process() * 0.2;
     }
 }
 
