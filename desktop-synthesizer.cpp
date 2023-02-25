@@ -35,7 +35,7 @@ uint8_t ControlPanel[35] = {
     0, // FilterDecay
     127, // FilterSustain
     0, // FilterRelease
-    0, // AmpAttack
+    1, // AmpAttack
     0, // AmpDecay
     127, // AmpSustain
     0, // AmpRelease
@@ -107,6 +107,8 @@ class Voice
         osc2_.SetWaveform(ValuePanel[CTRL_OSC2WAVEFORM]);
         osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH]);
 
+        noise_.Init();
+
         amp_env_.Init(samplerate);
         amp_env_.SetTime(ADENV_SEG_ATTACK, ValuePanel[CTRL_AMPATTACK]);
         amp_env_.SetTime(ADENV_SEG_DECAY, ValuePanel[CTRL_AMPDECAY]);
@@ -121,41 +123,46 @@ class Voice
 
     float Process()
     {
-        if(active_)
+        if(!active_)
         {
-            float sig, amp, lfo_out;
-            amp = amp_env_.Process(env_gate_); //change to account for both envelopes
-            if(!amp_env_.IsRunning())
-                active_ = false;
-            lfo_out = lfo.Process();
-
-            //amp should be set through the function
-            //osc1_.SetAmp(amp);
-            osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
-                            + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
-                            * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
-
-            //Not sure if phaseAdd is the best way to do frequency modulation
-            osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
-
-            osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
-
-            //osc2_.SetAmp(amp);
-            osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
-                            + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
-                            * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
-            osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
-
-            if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
-            {
-                osc2_.Reset();
-            }
-
-            sig = (osc1_.Process() * (1-ValuePanel[CTRL_OSCMIX])) + (osc2_.Process() * ValuePanel[CTRL_OSCMIX]);
-            filt_.Process(sig);
-            return filt_.Low() * (velocity_ / 127.f) * amp;
+            return 0.f;
         }
-        return 0.f;
+        float sig, amp, lfo_out;
+        amp = amp_env_.Process(env_gate_); //change to account for both envelopes
+        if(!amp_env_.IsRunning())
+            active_ = false;
+        lfo_out = lfo.Process();
+
+        //amp should be set through the function
+        //osc1_.SetAmp(amp);
+        osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
+                        + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
+                        * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
+
+        //Not sure if phaseAdd is the best way to do frequency modulation
+        osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
+
+        osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
+
+        //osc2_.SetAmp(amp);
+        osc2_.SetPw(ValuePanel[CTRL_OSC2PULSEWIDTH] 
+                        + (lfo_out * ValuePanel[CTRL_OSC2PWMOD] 
+                        * (0.5-ValuePanel[CTRL_OSC2PULSEWIDTH])));
+        osc2_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC2FREQUENCYMOD]);
+
+        if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
+        {
+            osc2_.Reset();
+        }
+
+        noise_.SetAmp(amp);
+
+        sig = (osc1_.Process() * (1-ValuePanel[CTRL_OSCMIX]))
+            + (osc2_.Process() * ValuePanel[CTRL_OSCMIX])
+            + (noise_.Process() * ValuePanel[CTRL_NOISE]);
+
+        filt_.Process(sig);
+        return filt_.Low() * (velocity_ / 127.f) * amp;
     }
 
     void OnNoteOn(uint8_t note, uint8_t velocity)
@@ -212,6 +219,10 @@ class Voice
                 break;
             case CTRL_OSC2SYNC:
                 ValuePanel[CTRL_OSC2SYNC] = ControlPanel[CTRL_OSC2SYNC] ? 1 : 0;
+                break;
+            case CTRL_NOISE:
+                ValuePanel[CTRL_NOISE] = ControlPanel[CTRL_NOISE] / 127.f;
+                break;
             case CTRL_OSCMIX:
                 ValuePanel[CTRL_OSCMIX] = ControlPanel[CTRL_OSCMIX] / 127.f;
             case CTRL_AMPATTACK:
@@ -251,6 +262,7 @@ class Voice
   private:
     Oscillator osc1_;
     Oscillator osc2_;
+    WhiteNoise noise_;
     Svf        filt_;
     Adsr       filt_env_;
     Adsr       amp_env_;
