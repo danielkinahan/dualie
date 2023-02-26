@@ -2,7 +2,7 @@
 
 A polyphonic, multi-oscillator synth with many bells and many whistles. Based around the Daisy Seed platform.
 
-##Controls
+## Controls
 | Control              | Description                 | Unit               |
 | --------------------| --------------------------- | ------------------ |
 | OSC1WAVEFORM         | Waveform of oscillator 1     | Wavetype                |
@@ -41,7 +41,8 @@ A polyphonic, multi-oscillator synth with many bells and many whistles. Based ar
 | FXPARAM2             | Parameter 2 of effect         | N/A                |
 | FXMIX                | Mix level of effect           | %                  |
 
-##Control-Flow diagram
+## Control-Flow Diagram
+
 ```mermaid
 flowchart TB
 
