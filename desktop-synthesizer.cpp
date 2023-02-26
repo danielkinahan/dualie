@@ -10,7 +10,7 @@ using namespace daisy::seed;
 
 static Oscillator       lfo;
 
-//Stores values in 0-127
+//Midi control values (0-127) which are stored in EEPROM as a preset
 uint8_t ControlPanel[35] = {
     0, // Osc1Waveform
     127, // Osc1PulseWidth
@@ -48,10 +48,9 @@ uint8_t ControlPanel[35] = {
     0, // FXParam2
     0 // FXMix
 };
-    //Don't think I need to add preset controls here
-    //TODO: Map the params to meaningful indeces of MIDI CC
 
-//Stores values in 0-127
+//Computed values of controls in respective units
+//These are computed outside of the Audio Callback for efficiency
 float ValuePanel[35] = {
     0, // Osc1Waveform
     0.5, // Osc1PulseWidth
@@ -116,7 +115,6 @@ class Voice
         filt_.Init(samplerate);
         filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]);
         filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]);
-        //filt_.SetDrive(0.8f);
     }
 
     float Process()
@@ -141,8 +139,7 @@ class Voice
             osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH] 
                             + (lfo_out * ValuePanel[CTRL_OSC1PWMOD] 
                             * (0.5-ValuePanel[CTRL_OSC1PULSEWIDTH])));
-            //Not sure if phaseAdd is the best way to do frequency modulation
-            osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);
+            osc1_.PhaseAdd(lfo_out * ValuePanel[CTRL_OSC1FREQUENCYMOD]);  //Not sure if PhaseAdd is the best way to do frequency modulation
         }
 
         if (!ValuePanel[CTRL_OSCSPLIT] || note_ > 63 )
@@ -181,7 +178,7 @@ class Voice
     void SetParam(int param) 
     {
         //Process paramater value changed
-        //TODO: investigate using bitwise shifts instead of divisions
+        //TODO: investigate ways to calculate without using expensive divisions
         switch(param)
         {
             case CTRL_OSC1WAVEFORM: 
@@ -245,12 +242,11 @@ class Voice
                 ValuePanel[CTRL_AMPRELEASE] = ControlPanel[CTRL_AMPRELEASE] / 64.f;
                 amp_env_.SetTime(ADSR_SEG_RELEASE, ValuePanel[CTRL_AMPRELEASE]); 
                 break;
-            //Use a Michaelis-Menten equation to scale frequency y = (-606.0853*x)/(-130.4988 + x)
-            case CTRL_FILTERCUTOFF: 
+            case CTRL_FILTERCUTOFF:
+                //Use a Michaelis-Menten equation to scale frequency y = (-606.0853*x)/(-130.4988 + x)
                 ValuePanel[CTRL_FILTERCUTOFF] = (ControlPanel[CTRL_FILTERCUTOFF] * -606.0853) / (ControlPanel[CTRL_FILTERCUTOFF] - 130.4988);
                 filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]); 
                 break;
-            //Awful sounds at values past 0.95!
             case CTRL_FILTERRESONANCE:
                 ValuePanel[CTRL_FILTERRESONANCE] = ControlPanel[CTRL_FILTERRESONANCE] / 134.0f;
                 filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]); 
