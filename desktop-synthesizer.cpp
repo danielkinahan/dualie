@@ -95,7 +95,6 @@ class Voice
     ~Voice() {}
     void Init(float samplerate)
     {
-        active_ = false;
         osc1_.Init(samplerate);
         osc1_.SetWaveform(ValuePanel[CTRL_OSC1WAVEFORM]);
         osc1_.SetPw(ValuePanel[CTRL_OSC1PULSEWIDTH]);
@@ -119,14 +118,12 @@ class Voice
 
     float Process()
     {
-        if(!active_)
-        {
-            return 0;
-        }
         float sig, amp, lfo_out;
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())
-            active_ = false;
+        {
+            return 0;
+        }
 
         lfo_out = lfo.Process();
 
@@ -169,7 +166,6 @@ class Voice
         velocity_ = velocity / 127.f;
         osc1_.SetFreq(mtof(note_));
         osc2_.SetFreq(mtof(note_));
-        active_   = true;
         env_gate_ = true;
     }
 
@@ -255,7 +251,7 @@ class Voice
         }
     }
 
-    inline bool  IsActive() const { return active_; }
+    inline bool  IsActive() const { return amp_env_.IsRunning(); }
     inline float GetNote() const { return note_; }
 
   private:
@@ -267,7 +263,6 @@ class Voice
     Adsr       amp_env_;
     uint8_t    note_;
     float      velocity_;
-    bool       active_;
     bool       env_gate_;
 };
 
