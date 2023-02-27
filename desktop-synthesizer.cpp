@@ -118,6 +118,10 @@ class Voice
 
     float Process()
     {
+        /*TODO: Optimize branching
+                refactor DSP code to process 16 blocks at a time
+                barrel shift
+        */
         float sig, amp, lfo_out;
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())
@@ -156,6 +160,9 @@ class Voice
         noise_.SetAmp(velocity_ * ValuePanel[CTRL_NOISE]);
 
         sig = osc1_.Process() + osc2_.Process() + noise_.Process();
+
+        //doesn't sound very good
+        //filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF] - (ValuePanel[CTRL_FILTERLFOMOD] * lfo_out * ValuePanel[CTRL_FILTERCUTOFF]));
 
         return filt_.Process(sig * amp);
     }
@@ -222,6 +229,18 @@ class Voice
             case CTRL_OSCSPLIT:
                 ValuePanel[CTRL_OSCSPLIT] = ControlPanel[CTRL_OSCSPLIT] ? 1 : 0;
                 break;
+            case CTRL_FILTERCUTOFF:
+                //Use a Michaelis-Menten equation to scale frequency y = (-606.0853*x)/(-130.4988 + x)
+                ValuePanel[CTRL_FILTERCUTOFF] = (ControlPanel[CTRL_FILTERCUTOFF] * -606.0853) / (ControlPanel[CTRL_FILTERCUTOFF] - 130.4988);
+                filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]); 
+                break;
+            case CTRL_FILTERRESONANCE:
+                ValuePanel[CTRL_FILTERRESONANCE] = ControlPanel[CTRL_FILTERRESONANCE] / 134.0f;
+                filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]); 
+                break;
+            case CTRL_FILTERLFOMOD:
+                ValuePanel[CTRL_FILTERLFOMOD] = ControlPanel[CTRL_FILTERLFOMOD] / 127.f;
+                break;
             case CTRL_AMPATTACK:
                 ValuePanel[CTRL_AMPATTACK] = ControlPanel[CTRL_AMPATTACK] / 32.f;
                 amp_env_.SetTime(ADENV_SEG_ATTACK, (ValuePanel[CTRL_AMPATTACK])); 
@@ -237,15 +256,6 @@ class Voice
             case CTRL_AMPRELEASE: 
                 ValuePanel[CTRL_AMPRELEASE] = ControlPanel[CTRL_AMPRELEASE] / 64.f;
                 amp_env_.SetTime(ADSR_SEG_RELEASE, ValuePanel[CTRL_AMPRELEASE]); 
-                break;
-            case CTRL_FILTERCUTOFF:
-                //Use a Michaelis-Menten equation to scale frequency y = (-606.0853*x)/(-130.4988 + x)
-                ValuePanel[CTRL_FILTERCUTOFF] = (ControlPanel[CTRL_FILTERCUTOFF] * -606.0853) / (ControlPanel[CTRL_FILTERCUTOFF] - 130.4988);
-                filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]); 
-                break;
-            case CTRL_FILTERRESONANCE:
-                ValuePanel[CTRL_FILTERRESONANCE] = ControlPanel[CTRL_FILTERRESONANCE] / 134.0f;
-                filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]); 
                 break;
             default: break;
         }
@@ -404,7 +414,8 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
 
 int main(void)
 {
-    hw.Init();
+    hw.Init(true);
+    //hw.SetAudioBlockSize(16);
 
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
