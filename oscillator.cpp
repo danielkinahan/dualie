@@ -61,7 +61,7 @@ void Oscillator::ProcessBlock(float *buf, size_t size)
         }
         eor_ = (phase_ - phase_inc_ < PI_F && phase_ >= PI_F);
 
-        buf[i] = out * amp_;
+        buf[i] = out; // amp no longer affects output * amp_;
     }
 }
 
