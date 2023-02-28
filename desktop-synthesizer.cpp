@@ -2,13 +2,14 @@
 #include "daisysp.h"
 #include "desktop-synthesizer.h"
 #include<cmath>
+#include "oscillator.h"
 
 using namespace std;
 using namespace daisy;
 using namespace daisysp;
 using namespace daisy::seed;
 
-static Oscillator       lfo;
+static custom::Oscillator       lfo;
 
 //Midi control values (0-127) which are stored in EEPROM as a preset
 uint8_t ControlPanel[35] = {
@@ -265,8 +266,8 @@ class Voice
     inline float GetNote() const { return note_; }
 
   private:
-    Oscillator osc1_;
-    Oscillator osc2_;
+    custom::Oscillator osc1_;
+    custom::Oscillator osc2_;
     WhiteNoise noise_;
     MoogLadder filt_;
     Adsr       filt_env_;
