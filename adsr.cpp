@@ -92,6 +92,51 @@ void Adsr::SetTimeConstant(float timeInS, float& time, float& coeff)
     }
 }
 
+void Adsr::ProcessBlock(float *buf, size_t size, bool gate)
+{
+    for (size_t i = 0; i < size; i++)
+    {
+        float out = 0.0f;
+
+        if(gate && !gate_) // rising edge
+            mode_ = ADSR_SEG_ATTACK;
+        else if(!gate && gate_) // falling edge
+            mode_ = ADSR_SEG_RELEASE;
+        gate_ = gate;
+
+        float D0(attackD0_);
+        if(mode_ == ADSR_SEG_DECAY)
+            D0 = decayD0_;
+        else if(mode_ == ADSR_SEG_RELEASE)
+            D0 = releaseD0_;
+
+        float target = mode_ == ADSR_SEG_DECAY ? sus_level_ : -0.01f;
+        switch(mode_)
+        {
+            case ADSR_SEG_IDLE: out = 0.0f; break;
+            case ADSR_SEG_ATTACK:
+                x_ += D0 * (attackTarget_ - x_);
+                out = x_;
+                if(out > 1.f)
+                {
+                    x_ = out = 1.f;
+                    mode_    = ADSR_SEG_DECAY;
+                }
+                break;
+            case ADSR_SEG_DECAY:
+            case ADSR_SEG_RELEASE:
+                x_ += D0 * (target - x_);
+                out = x_;
+                if(out < 0.0f)
+                {
+                    x_ = out = 0.f;
+                    mode_    = ADSR_SEG_IDLE;
+                }
+            default: break;
+        }
+        buf[i] = out;
+    }
+}
 
 float Adsr::Process(bool gate)
 {

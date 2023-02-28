@@ -41,6 +41,73 @@ void MoogLadder::Init(float sample_rate)
     old_res_  = -1.0f;
 }
 
+void MoogLadder::ProcessBlock(float *buf, size_t size, float *in)
+{
+    for (size_t i = 0; i < size; i++)
+    {
+        float  freq = freq_;
+        float  res  = res_;
+        float  res4;
+        float* delay   = delay_;
+        float* tanhstg = tanhstg_;
+        float  stg[4];
+        float  acr, tune;
+
+        float THERMAL = 0.000025;
+
+        if(res < 0)
+        {
+            res = 0;
+        }
+
+        if(old_freq_ != freq || old_res_ != res)
+        {
+            float f, fc, fc2, fc3, fcr;
+            old_freq_ = freq;
+            fc        = (freq / sample_rate_);
+            f         = 0.5f * fc;
+            fc2       = fc * fc;
+            fc3       = fc2 * fc2;
+
+            fcr  = 1.8730f * fc3 + 0.4955f * fc2 - 0.6490f * fc + 0.9988f;
+            acr  = -3.9364f * fc2 + 1.8409f * fc + 0.9968f;
+            tune = (1.0f - expf(-((2 * PI_F) * f * fcr))) / THERMAL;
+
+            old_res_  = res;
+            old_acr_  = acr;
+            old_tune_ = tune;
+        }
+        else
+        {
+            res  = old_res_;
+            acr  = old_acr_;
+            tune = old_tune_;
+        }
+
+        res4 = 4.0f * res * acr;
+
+        for(int j = 0; j < 2; j++)
+        {
+            in[i] -= res4 * delay[5];
+            delay[0] = stg[0]
+                = delay[0] + tune * (my_tanh(in[i] * THERMAL) - tanhstg[0]);
+            for(int k = 1; k < 4; k++)
+            {
+                in[i]     = stg[k - 1];
+                stg[k] = delay[k]
+                        + tune
+                            * ((tanhstg[k - 1] = my_tanh(in[i] * THERMAL))
+                                - (k != 3 ? tanhstg[k]
+                                            : my_tanh(delay[k] * THERMAL)));
+                delay[k] = stg[k];
+            }
+            delay[5] = (stg[3] + delay[4]) * 0.5f;
+            delay[4] = stg[3];
+        }
+        buf[i] = delay[5];
+    }
+}
+
 float MoogLadder::Process(float in)
 {
     float  freq = freq_;

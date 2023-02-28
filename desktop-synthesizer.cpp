@@ -6,6 +6,7 @@
 #include "adsr.h"
 #include "moogladder.h"
 #include "whitenoise.h"
+#include "arm_math.h"
 
 using namespace std;
 using namespace daisy;
@@ -118,6 +119,18 @@ class Voice
         filt_.Init(samplerate);
         filt_.SetFreq(ValuePanel[CTRL_FILTERCUTOFF]);
         filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]);
+    }
+
+    void ProcessBlock(float *buf, size_t size)
+    {
+        float amp_out[size], osc1_out[size], osc2_out[size];
+        amp_env_.ProcessBlock(amp_out, size, env_gate_);
+        
+        osc1_.ProcessBlock(osc1_out, size);
+        osc2_.ProcessBlock(osc2_out, size);
+
+        arm_add_f32(osc1_out, osc2_out, buf, 16);
+        arm_mult_f32(osc1_out, amp_out, buf, 16);
     }
 
     float Process()
@@ -275,9 +288,9 @@ class Voice
     custom::MoogLadder filt_;
     custom::Adsr       filt_env_;
     custom::Adsr       amp_env_;
-    uint8_t    note_;
-    float      velocity_;
-    bool       env_gate_;
+    uint8_t            note_;
+    float              velocity_;
+    bool               env_gate_;
 };
 
 template <size_t max_voices>
@@ -292,6 +305,16 @@ class VoiceManager
         for(size_t i = 0; i < max_voices; i++)
         {
             voices[i].Init(samplerate);
+        }
+    }
+
+    void ProcessBlock(float *buf, size_t size)
+    {
+        for(size_t i = 0; i < max_voices; i++)
+        {
+            float temp[size];
+            voices[i].ProcessBlock(temp, size);
+            arm_add_f32(buf, temp, buf, 16);
         }
     }
 
@@ -373,17 +396,19 @@ class VoiceManager
     }
 };
 
-static VoiceManager<6> mgr;
+static VoiceManager<24> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
 static MidiUsbHandler   midi;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
-    for(size_t i = 0; i < size; i++)
-    {
-        out[0][i] = out[1][i] = mgr.Process() * 0.2;
-    }
+    float buf[size];
+    mgr.ProcessBlock(buf, size);
+
+    arm_scale_f32(buf, 0.2, buf, 16);
+
+    out[0] = out[1] = buf;
 }
 
 void HandleControls(int ctrlValue, int param, bool midiCC)
@@ -419,7 +444,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
 int main(void)
 {
     hw.Init(true);
-    //hw.SetAudioBlockSize(16);
+    hw.SetAudioBlockSize(16);
 
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;

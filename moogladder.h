@@ -24,6 +24,7 @@ class MoogLadder
     */
     void Init(float sample_rate);
 
+    void ProcessBlock(float *buf, size_t size, float *in);
 
     /** Processes the lowpass filter
     */

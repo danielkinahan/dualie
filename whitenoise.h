@@ -26,6 +26,17 @@ class WhiteNoise
     /** sets the amplitude of the noise output
     */
     inline void SetAmp(float a) { amp_ = a; }
+
+    inline void ProcessBlock(float *buf, size_t size)
+    {
+        for (size_t i = 0; i < size; i++)
+        {
+          randseed_ *= 16807;
+          buf[i] = (randseed_ * coeff_) * amp_;
+        }
+    }
+
+
     /** returns a new sample of noise in the range of -amp_ to amp_
     */
     inline float Process()

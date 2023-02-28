@@ -47,6 +47,8 @@ class Adsr
     /** Processes one sample through the filter and returns one sample.
         \param gate - trigger the envelope, hold it to sustain 
     */
+    void ProcessBlock(float *buf, size_t size, bool gate);
+
     float Process(bool gate);
     /** Sets time
         Set time per segment in seconds
