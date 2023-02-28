@@ -2,7 +2,7 @@
 TARGET = desktop-synthesizer
 
 # Sources
-CPP_SOURCES = desktop-synthesizer.cpp oscillator.cpp
+CPP_SOURCES = desktop-synthesizer.cpp oscillator.cpp adsr.cpp moogladder.cpp
 
 # Library Locations
 LIBDAISY_DIR = ../DaisyExamples/libDaisy/

@@ -3,6 +3,9 @@
 #include "desktop-synthesizer.h"
 #include<cmath>
 #include "oscillator.h"
+#include "adsr.h"
+#include "moogladder.h"
+#include "whitenoise.h"
 
 using namespace std;
 using namespace daisy;
@@ -268,10 +271,10 @@ class Voice
   private:
     custom::Oscillator osc1_;
     custom::Oscillator osc2_;
-    WhiteNoise noise_;
-    MoogLadder filt_;
-    Adsr       filt_env_;
-    Adsr       amp_env_;
+    custom::WhiteNoise noise_;
+    custom::MoogLadder filt_;
+    custom::Adsr       filt_env_;
+    custom::Adsr       amp_env_;
     uint8_t    note_;
     float      velocity_;
     bool       env_gate_;
