@@ -14,7 +14,7 @@ void Oscillator::ProcessBlock(float *buf, size_t size)
     {
         switch(waveform_)
         {
-            case WAVE_SIN: out = sinf(phase_); break;
+            case WAVE_SIN: out = arm_sin_f32(phase_); break;
             case WAVE_TRI:
                 t   = -1.0f + (2.0f * phase_ * TWO_PI_RECIP);
                 out = 2.0f * (fabsf(t) - 0.5f);

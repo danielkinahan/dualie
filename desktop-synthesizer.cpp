@@ -1,7 +1,7 @@
 #include "daisy_seed.h"
 #include "daisysp.h"
 #include "desktop-synthesizer.h"
-#include<cmath>
+
 #include "oscillator.h"
 #include "adsr.h"
 #include "moogladder.h"
@@ -129,8 +129,8 @@ class Voice
         osc1_.ProcessBlock(osc1_out, size);
         osc2_.ProcessBlock(osc2_out, size);
 
-        arm_add_f32(osc1_out, osc2_out, buf, 16);
-        arm_mult_f32(osc1_out, amp_out, buf, 16);
+        arm_add_f32(osc1_out, osc2_out, buf, size);
+        arm_mult_f32(buf, amp_out, buf, size);
     }
 
     float Process()
@@ -308,16 +308,6 @@ class VoiceManager
         }
     }
 
-    void ProcessBlock(float *buf, size_t size)
-    {
-        for(size_t i = 0; i < max_voices; i++)
-        {
-            float temp[size];
-            voices[i].ProcessBlock(temp, size);
-            arm_add_f32(buf, temp, buf, 16);
-        }
-    }
-
     float Process()
     {
         float sum;
@@ -327,6 +317,16 @@ class VoiceManager
             sum += voices[i].Process();
         }
         return sum;
+    }
+
+    void ProcessBlock(float *buf, size_t size)
+    {
+        for(size_t i = 0; i < max_voices; i++)
+        {
+            float temp[size];
+            voices[i].ProcessBlock(temp, size);
+            arm_add_f32(buf, temp, buf, size);
+        }
     }
 
     void OnNoteOn(uint8_t notenumber, uint8_t velocity)
@@ -403,10 +403,18 @@ static MidiUsbHandler   midi;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
+    for(size_t i = 0; i < size; i++)
+    {
+        out[0][i] = out[1][i] = mgr.Process() * 0.1;
+    }
+}
+
+void AudioCallbackBlock(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
+{
     float buf[size];
     mgr.ProcessBlock(buf, size);
 
-    arm_scale_f32(buf, 0.2, buf, 16);
+    arm_scale_f32(buf, 0.1, buf, size);
 
     out[0] = out[1] = buf;
 }
@@ -444,7 +452,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
 int main(void)
 {
     hw.Init(true);
-    hw.SetAudioBlockSize(16);
+    //hw.SetAudioBlockSize(16);
 
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
@@ -463,10 +471,10 @@ int main(void)
     lfo.SetFreq(0);
 
     // start the audio callback
-    hw.StartAudio(AudioCallback);
+    hw.StartAudio(AudioCallbackBlock);
     while(1)
     {
-        enc.Debounce();
+        //enc.Debounce();
         //Process parameter selection
         if(enc.Pressed())
         {

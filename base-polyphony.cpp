@@ -1,6 +1,12 @@
 #include "daisysp.h"
 #include "daisy_seed.h"
-#include <algorithm>
+#include "desktop-synthesizer.h"
+
+#include "oscillator.h"
+#include "adsr.h"
+#include "moogladder.h"
+#include "whitenoise.h"
+#include "arm_math.h"
 
 using namespace daisysp;
 using namespace daisy;
@@ -21,6 +27,16 @@ class Voice
         env_.SetTime(ADSR_SEG_ATTACK, 0.1f);
         env_.SetTime(ADSR_SEG_DECAY, 0.005f);
         env_.SetTime(ADSR_SEG_RELEASE, 0.01f);
+    }
+
+    void ProcessBlock(float *buf, size_t size)
+    {
+        float amp_out[size], osc_out[size];
+        env_.ProcessBlock(amp_out, size, env_gate_);
+        
+        osc_.ProcessBlock(osc_out, size);
+
+        arm_mult_f32(osc_out, amp_out, buf, size);
     }
 
     float Process()
@@ -49,8 +65,8 @@ class Voice
     inline float GetNote() const { return note_; }
 
   private:
-    Oscillator osc_;
-    Adsr       env_;
+    custom::Oscillator osc_;
+    custom::Adsr       env_;
     float      note_, velocity_;
     bool       env_gate_;
 };
@@ -67,6 +83,16 @@ class VoiceManager
         for(size_t i = 0; i < max_voices; i++)
         {
             voices[i].Init(samplerate);
+        }
+    }
+
+    void ProcessBlock(float *buf, size_t size)
+    {
+        for(size_t i = 0; i < max_voices; i++)
+        {
+            float temp[size];
+            voices[i].ProcessBlock(temp, size);
+            arm_add_f32(buf, temp, buf, size);
         }
     }
 
@@ -138,6 +164,16 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
     }
 }
 
+void AudioCallbackBlock(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
+{
+    float buf[size];
+    mgr.ProcessBlock(buf, size);
+
+    arm_scale_f32(buf, 0.2, buf, size);
+
+    out[0] = out[1] = buf;
+}
+
 void HandleMidiMessage(MidiEvent m)
 {
     switch(m.type)
@@ -168,13 +204,15 @@ void HandleMidiMessage(MidiEvent m)
 int main(void)
 {
     hw.Init();
+    hw.SetAudioBlockSize(16);
+    
     MidiUsbHandler::Config midi_cfg;
     midi_cfg.transport_config.periph = MidiUsbTransport::Config::INTERNAL;
     midi.Init(midi_cfg);
 
     mgr.Init(hw.AudioSampleRate());
 
-    hw.StartAudio(AudioCallback);
+    hw.StartAudio(AudioCallbackBlock);
     midi.StartReceive();
 
     for(;;) 
