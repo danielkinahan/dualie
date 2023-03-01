@@ -123,14 +123,33 @@ class Voice
 
     void ProcessBlock(float *buf, size_t size)
     {
-        float amp_out[size], osc1_out[size], osc2_out[size];
-        amp_env_.ProcessBlock(amp_out, size, env_gate_);
-        
-        osc1_.ProcessBlock(osc1_out, size);
-        osc2_.ProcessBlock(osc2_out, size);
+        float osc1_out[size], osc2_out[size], 
+                amp_out[size], lfo_out[size],
+                pw1_out[size], pw2_out[size], pwlfo_out[size],
+                fm1_out[size], fm2_out[size];
+ 
+        std::fill_n (pwlfo_out, size, 0.5);
+
+        float pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
+        float pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
+
+        lfo.ProcessBlock(lfo_out, pwlfo_out, size);
+
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1PWMOD], pw1_out, size);
+        arm_scale_f32(pw1_out, pw1_diff, pw1_out, size);
+        arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
+        osc1_.ProcessBlock(osc1_out, pw1_out, size);
+
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2PWMOD], pw2_out, size);
+        arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
+        arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);        
+        osc2_.ProcessBlock(osc2_out, pw2_out, size);
 
         arm_add_f32(osc1_out, osc2_out, buf, size);
+        amp_env_.ProcessBlock(amp_out, size, env_gate_);
+        arm_scale_f32(amp_out, velocity_, amp_out, size);
         arm_mult_f32(buf, amp_out, buf, size);
+
     }
 
     float Process()
@@ -452,7 +471,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
 int main(void)
 {
     hw.Init(true);
-    //hw.SetAudioBlockSize(16);
+    hw.SetAudioBlockSize(16);
 
     // Initialize USB Midi 
     MidiUsbHandler::Config midi_cfg;
@@ -463,7 +482,7 @@ int main(void)
     mgr.Init(hw.AudioSampleRate());
     lfo.Init(hw.AudioSampleRate());
 
-    uint8_t param = 0;
+    //uint8_t param = 0;
 
     lfo.SetAmp(1);
     lfo.SetWaveform(Oscillator::WAVE_SIN);
@@ -472,9 +491,9 @@ int main(void)
 
     // start the audio callback
     hw.StartAudio(AudioCallbackBlock);
-    while(1)
+    for(;;)
     {
-        //enc.Debounce();
+        /*enc.Debounce(); //adds so much noise
         //Process parameter selection
         if(enc.Pressed())
         {
@@ -488,6 +507,7 @@ int main(void)
         {
             HandleControls(enc.Increment(), param, false);
         }
+        */
         // Listen to MIDI
         midi.Listen();
 

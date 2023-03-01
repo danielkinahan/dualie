@@ -7,11 +7,12 @@ static inline float Polyblep(float phase_inc, float t);
 
 constexpr float TWO_PI_RECIP = 1.0f / TWOPI_F;
 
-void Oscillator::ProcessBlock(float *buf, size_t size)
+void Oscillator::ProcessBlock(float *buf, float *pw_buf, size_t size)
 {
     float out, t;
     for (size_t i = 0; i < size; i++)
     {
+        SetPw(pw_buf[i]);
         switch(waveform_)
         {
             case WAVE_SIN: out = arm_sin_f32(phase_); break;
