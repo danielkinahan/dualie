@@ -418,7 +418,7 @@ class VoiceManager
 static VoiceManager<24> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
-static MidiUsbHandler   midi;
+MidiUartHandler   midi;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
@@ -473,9 +473,8 @@ int main(void)
     hw.Init(true);
     hw.SetAudioBlockSize(16);
 
-    // Initialize USB Midi 
-    MidiUsbHandler::Config midi_cfg;
-    midi_cfg.transport_config.periph = MidiUsbTransport::Config::INTERNAL;
+    // Initialize Midi 
+    MidiUartHandler::Config midi_cfg;
 
     midi.Init(midi_cfg);
     enc.Init(hw.GetPin(0), hw.GetPin(2), hw.GetPin(1));
@@ -491,6 +490,8 @@ int main(void)
 
     // start the audio callback
     hw.StartAudio(AudioCallbackBlock);
+    midi.StartReceive();
+
     for(;;)
     {
         /*enc.Debounce(); //adds so much noise
