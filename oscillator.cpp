@@ -16,23 +16,17 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
 
     for (size_t i = 0; i < size; i++)
     {
-        if(reset && reset_vector[i])
-        {
-            phase_ = 0;
-            phase_vector[i] = phase_;
-            continue;
-        }
         phase_ += phase_inc_;
         if(phase_ > TWOPI_F)
         {
             phase_ -= TWOPI_F;
-            reset_vector[i] = true; //end of cycle
-        }
-        else
-        {
-            reset_vector[i] = false;
         }
         //eor_ = (phase_ - phase_inc_ < PI_F && phase_ >= PI_F); //end of rise - not using right now
+
+        phase_ *= !(reset && reset_vector[i]); 
+        //This is now going to be overwritten by Osc2
+        reset_vector[i] = (phase_ > TWOPI_F);
+
         phase_vector[i] = phase_;
     }
 
