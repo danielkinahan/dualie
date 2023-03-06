@@ -1,19 +1,19 @@
 #include <Utility/dsp.h>
 #include "oscillator.h"
 #include "arm_math.h"
+#include "arm_common_tables.h"
 
 using namespace custom;
 static inline float Polyblep(float phase_inc, float t);
+inline void SinBlock(float *buf, float *phase_vector, size_t size);
 
 constexpr float TWO_PI_RECIP = 1.0f / TWOPI_F;
 
 void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *reset_vector, bool reset, size_t size)
 {
-    //TODO: Add phase incr vector modulated by fm_bufs
     float double_pi_recip;
-    float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];//, phase_inc_vector[size];
+    float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];
 
-    //switching to phase_vector saves 5% avg load
     for (size_t i = 0; i < size; i++)
     {
         if(reset && reset_vector[i])
@@ -46,10 +46,7 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
     switch(waveform_)
     {
         case WAVE_SIN:
-            for (size_t i = 0; i < size; i++)
-            {
-                buf[i] = arm_sin_f32(phase_vector[i]);
-            }
+            SinBlock(buf, phase_vector, size);
             break;
         case WAVE_TRI:
             arm_scale_f32(phase_vector, double_pi_recip, t_vector, size);
@@ -178,6 +175,46 @@ float Oscillator::Process()
 float Oscillator::CalcPhaseInc(float f)
 {
     return (TWOPI_F * f) * sr_recip_;
+}
+
+void SinBlock(float *buf, float *phase_vector, size_t size)
+{
+    float in[size];
+    float sinVal, fract;                           /* Temporary variables for input, output */
+    uint16_t index;                                        /* Index variable */
+    float a, b;                                        /* Two nearest output values */
+    int32_t n;
+    float findex;
+
+    //Removed special case for small negative inputs
+
+    /* input x is in radians */
+    /* Scale the input to [0 1] range from [0 2*PI] , divide input by 2*pi */
+    arm_scale_f32(phase_vector, TWO_PI_RECIP, in, size);
+    for (size_t i = 0; i < size; i++)
+    {
+        /* Calculation of floor value of input */
+        n = (int32_t) in[i];
+        /* Make negative values towards -infinity */
+        if (phase_vector[i] < 0.0f)
+        {
+            n--;
+        }
+        /* Map input value to [0 1] */
+        in[i] = in[i] - (float) n;
+        /* Calculation of index of the table */
+        findex = (float) FAST_MATH_TABLE_SIZE * in[i];
+        index = ((uint16_t)findex) & 0x1ff;
+        /* fractional value calculation */
+        fract = findex - (float) index;
+        /* Read two nearest values of input value from the sin table */
+        a = sinTable_f32[index];
+        b = sinTable_f32[index+1];
+        /* Linear interpolation process */
+        sinVal = (1.0f-fract)*a + fract*b;
+        /* Return the output value */
+        buf[i] = sinVal;
+    }
 }
 
 static float Polyblep(float phase_inc, float t)
