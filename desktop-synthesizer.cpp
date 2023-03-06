@@ -162,9 +162,7 @@ class Voice
         osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, ValuePanel[CTRL_OSC2SYNC], size);
 
         //If CTRL_OSCSPLIT enabled, silence each oscillator on oposite sides
-        split_high = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
         arm_scale_f32(osc1_out, split_high, osc1_out, size);
-        split_low = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
         arm_scale_f32(osc2_out, split_low, osc2_out, size);
 
         //Noise
@@ -237,6 +235,8 @@ class Voice
         osc1_.SetFreq(mtof(note_));
         osc2_.SetFreq(mtof(note_));
         env_gate_ = true;
+        split_high_ = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
+        split_low_ = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
     }
 
     void OnNoteOff() { env_gate_ = false; }
@@ -337,7 +337,7 @@ class Voice
     custom::Adsr       amp_env_;
     uint8_t            note_;
     float              velocity_;
-    bool               env_gate_;
+    bool               env_gate_, split_high_, split_low_;
 };
 
 template <size_t max_voices>
@@ -446,8 +446,8 @@ class VoiceManager
 static VoiceManager<24> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
-MidiUartHandler   midi;
-CpuLoadMeter loadMeter;
+MidiUartHandler         midi;
+CpuLoadMeter            loadMeter;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
