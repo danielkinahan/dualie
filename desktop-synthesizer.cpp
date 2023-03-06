@@ -181,10 +181,6 @@ class Voice
 
     float Process()
     {
-        /*TODO: Optimize branching
-                refactor DSP code to process 16 blocks at a time
-                barrel shift
-        */
         float sig, amp, lfo_out;
         amp = amp_env_.Process(env_gate_); //change to account for both envelopes
         if(!amp_env_.IsRunning())

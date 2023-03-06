@@ -13,15 +13,13 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
     float double_pi_recip;
     float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];//, phase_inc_vector[size];
 
-    //Block processing PhaseAdd
-    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
-
     //switching to phase_vector saves 5% avg load
     for (size_t i = 0; i < size; i++)
     {
         if(reset && reset_vector[i])
         {
-            phase_vector[i] = 0;
+            phase_ = 0;
+            phase_vector[i] = phase_;
             continue;
         }
         phase_ += phase_inc_;
@@ -38,6 +36,8 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
         phase_vector[i] = phase_;
     }
 
+    //Block processing PhaseAdd
+    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
     //Add phase - this doesn't sound right
     arm_add_f32(phase_vector, fm_buf, phase_vector, size);
 
