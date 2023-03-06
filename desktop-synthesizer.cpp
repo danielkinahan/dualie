@@ -123,7 +123,7 @@ class Voice
 
     void ProcessBlock(float *buf, size_t size)
     {
-        float osc1_out[size], osc2_out[size], 
+        float osc1_out[size], osc2_out[size], noise_out[size],
                 amp_out[size], lfo_out[size],
                 pw1_out[size], pw2_out[size], pwlfo_out[size],
                 fm1_out[size], fm2_out[size], fmlfo_out[size],
@@ -162,16 +162,21 @@ class Voice
         //Process osc2 with enabled resets
         osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, true, size);
 
-        //If keyboard split, silence each oscillator on oposite sides
+        //If CTRL_OSCSPLIT enabled, silence each oscillator on oposite sides
         split_high = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
         arm_scale_f32(osc1_out, split_high, osc1_out, size);
         split_low = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
         arm_scale_f32(osc2_out, split_low, osc2_out, size);
 
+        //Noise
+        noise_.ProcessBlock(noise_out, size);
+
         //Mixer
         arm_scale_f32(osc1_out, (1-ValuePanel[CTRL_OSCMIX]), osc1_out, size);
         arm_scale_f32(osc2_out, ValuePanel[CTRL_OSCMIX], osc2_out, size);
         arm_add_f32(osc1_out, osc2_out, buf, size);
+        arm_scale_f32(noise_out, ValuePanel[CTRL_NOISE], noise_out, size);
+        arm_add_f32(buf, noise_out, buf, size);
 
         //Amplifier
         amp_env_.ProcessBlock(amp_out, size, env_gate_);

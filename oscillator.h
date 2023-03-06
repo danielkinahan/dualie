@@ -97,7 +97,8 @@ class Oscillator
     */
     inline bool IsFalling() { return phase_ >= PI_F; }
 
-    /** Processes the waveform to be generated, returning size number of samples. This should be called once per audiocallback.
+    /** Processes the waveform to be generated, returning size number of samples. This should be called once per block.
+     * Doesn't process the amplifier provided.
     */
     void ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *reset_vector, bool reset, size_t size);
 
