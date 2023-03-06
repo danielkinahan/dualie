@@ -7,27 +7,39 @@ static inline float Polyblep(float phase_inc, float t);
 
 constexpr float TWO_PI_RECIP = 1.0f / TWOPI_F;
 
-void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, size_t size)
+void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *reset_vector, bool reset, size_t size)
 {
     //TODO: Add phase incr vector modulated by fm_bufs
     float double_pi_recip;
-    float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];
+    float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];//, phase_inc_vector[size];
+
+    //Block processing PhaseAdd
+    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
+
     //switching to phase_vector saves 5% avg load
     for (size_t i = 0; i < size; i++)
     {
+        if(reset && reset_vector[i])
+        {
+            phase_vector[i] = 0;
+            continue;
+        }
         phase_ += phase_inc_;
         if(phase_ > TWOPI_F)
         {
             phase_ -= TWOPI_F;
-            eoc_ = true; //end of cycle
+            reset_vector[i] = true; //end of cycle
         }
         else
         {
-            eoc_ = false;
+            reset_vector[i] = false;
         }
-        eor_ = (phase_ - phase_inc_ < PI_F && phase_ >= PI_F); //end of rise
+        //eor_ = (phase_ - phase_inc_ < PI_F && phase_ >= PI_F); //end of rise - not using right now
         phase_vector[i] = phase_;
     }
+
+    //Add phase - this doesn't sound right
+    arm_add_f32(phase_vector, fm_buf, phase_vector, size);
 
     double_pi_recip = 2.0f * TWO_PI_RECIP;
 

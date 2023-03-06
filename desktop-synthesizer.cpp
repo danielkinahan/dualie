@@ -126,50 +126,57 @@ class Voice
         float osc1_out[size], osc2_out[size], 
                 amp_out[size], lfo_out[size],
                 pw1_out[size], pw2_out[size], pwlfo_out[size],
-                fm1_out[size], fm2_out[size], fmlfo_out[size];
+                fm1_out[size], fm2_out[size], fmlfo_out[size],
+                reset_vector[size];
+        float pw1_diff, pw2_diff;
+        bool split_high, split_low;
 
-        //2%
+        //Set fixed values for LFO modulation buffers
         arm_fill_f32(0.5, pwlfo_out, size);
         arm_fill_f32(0, fmlfo_out, size);
-        float pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
-        float pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
 
-        //24%
-        lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, size);
+        //Process LFO
+        lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, reset_vector, false, size);
 
-        //4%
+        //Set modulated values for osc1
+        pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1PWMOD], pw1_out, size);
         arm_scale_f32(pw1_out, pw1_diff, pw1_out, size);
         arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1FREQUENCYMOD], fm1_out, size);
 
-        //24%
-        osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, size);
+        //Process osc1 and disabled resets
+        osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, reset_vector, false, size);
 
-        //4%
+        //Set modulated values for osc2, adding reset vector and
+        pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2PWMOD], pw2_out, size);
         arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
         arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2FREQUENCYMOD], fm2_out, size);
-
-        //4%
+        //Set reset vector to all 0s if sync ctrl is off
+        arm_scale_f32(reset_vector, ValuePanel[CTRL_OSC2SYNC], reset_vector, size);  
+        //Adjust tuning
         osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
 
-        //1%
-        if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
-        {
-            osc2_.Reset();
-        }
+        //Process osc2 with enabled resets
+        osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, true, size);
 
-        //24%
-        osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, size);
+        //If keyboard split, silence each oscillator on oposite sides
+        split_high = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
+        arm_scale_f32(osc1_out, split_high, osc1_out, size);
+        split_low = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
+        arm_scale_f32(osc2_out, split_low, osc2_out, size);
 
-        //8%
+        //Mixer
+        arm_scale_f32(osc1_out, (1-ValuePanel[CTRL_OSCMIX]), osc1_out, size);
+        arm_scale_f32(osc2_out, ValuePanel[CTRL_OSCMIX], osc2_out, size);
         arm_add_f32(osc1_out, osc2_out, buf, size);
+
+        //Amplifier
         amp_env_.ProcessBlock(amp_out, size, env_gate_);
         arm_scale_f32(amp_out, velocity_, amp_out, size);
         arm_mult_f32(buf, amp_out, buf, size);
-
     }
 
     float Process()
