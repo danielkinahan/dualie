@@ -145,7 +145,7 @@ class Voice
         arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1FREQUENCYMOD], fm1_out, size);
 
-        //Process osc1 and disabled resets
+        //Process osc1, resets disabled
         osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, reset_vector, false, size);
 
         //Set modulated values for osc2, adding reset vector and
@@ -154,13 +154,12 @@ class Voice
         arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
         arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2FREQUENCYMOD], fm2_out, size);
-        //Set reset vector to all 0s if sync ctrl is off
-        arm_scale_f32(reset_vector, ValuePanel[CTRL_OSC2SYNC], reset_vector, size);  
+
         //Adjust tuning
         osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
 
-        //Process osc2 with enabled resets
-        osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, true, size);
+        //Process osc2 with reset value set to ValuePanel[CTRL_OSC2SYNC]
+        osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, ValuePanel[CTRL_OSC2SYNC], size);
 
         //If CTRL_OSCSPLIT enabled, silence each oscillator on oposite sides
         split_high = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
