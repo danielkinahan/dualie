@@ -419,23 +419,29 @@ static VoiceManager<24> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
 MidiUartHandler   midi;
+CpuLoadMeter loadMeter;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
+    loadMeter.OnBlockStart();
     for(size_t i = 0; i < size; i++)
     {
         out[0][i] = out[1][i] = mgr.Process() * 0.1;
     }
+    loadMeter.OnBlockEnd();
 }
 
 void AudioCallbackBlock(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
 {
+    loadMeter.OnBlockStart();
     float buf[size];
     mgr.ProcessBlock(buf, size);
 
     arm_scale_f32(buf, 0.1, buf, size);
 
     out[0] = out[1] = buf;
+
+    loadMeter.OnBlockEnd();
 }
 
 void HandleControls(int ctrlValue, int param, bool midiCC)
@@ -472,6 +478,7 @@ int main(void)
 {
     hw.Init(true);
     hw.SetAudioBlockSize(16);
+    hw.StartLog();
 
     // Initialize Midi 
     MidiUartHandler::Config midi_cfg;
@@ -480,6 +487,7 @@ int main(void)
     enc.Init(hw.GetPin(0), hw.GetPin(2), hw.GetPin(1));
     mgr.Init(hw.AudioSampleRate());
     lfo.Init(hw.AudioSampleRate());
+    loadMeter.Init(hw.AudioSampleRate(), hw.AudioBlockSize());
 
     //uint8_t param = 0;
 
@@ -509,12 +517,17 @@ int main(void)
             HandleControls(enc.Increment(), param, false);
         }
         */
+
         // Listen to MIDI
         midi.Listen();
 
         // When message waiting
         while(midi.HasEvents())
         {
+            //Calculate CPU average load
+            const float avgLoad = loadMeter.GetAvgCpuLoad();
+            hw.PrintLine("Avg: " FLT_FMT3, FLT_VAR3(avgLoad * 100.0f));
+
             // Take oldest one
             auto msg = midi.PopEvent();
             switch(msg.type)
