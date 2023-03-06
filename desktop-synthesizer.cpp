@@ -121,39 +121,12 @@ class Voice
         filt_.SetRes(ValuePanel[CTRL_FILTERRESONANCE]);
     }
 
-    void ProcessBlock(float *buf, size_t size)
+    void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, float *fm1_out, float *fm2_out, size_t size)
     {
-        float osc1_out[size], osc2_out[size], noise_out[size],
-                amp_out[size], lfo_out[size],
-                pw1_out[size], pw2_out[size], pwlfo_out[size],
-                fm1_out[size], fm2_out[size], fmlfo_out[size],
-                reset_vector[size];
-        float pw1_diff, pw2_diff;
-        bool split_high, split_low;
-
-        //Set fixed values for LFO modulation buffers
-        arm_fill_f32(0.5, pwlfo_out, size);
-        arm_fill_f32(0, fmlfo_out, size);
-
-        //Process LFO
-        lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, reset_vector, false, size);
-
-        //Set modulated values for osc1
-        pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
-        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1PWMOD], pw1_out, size);
-        arm_scale_f32(pw1_out, pw1_diff, pw1_out, size);
-        arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
-        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1FREQUENCYMOD], fm1_out, size);
+        float osc1_out[size], osc2_out[size], noise_out[size], amp_out[size], reset_vector[size];
 
         //Process osc1, resets disabled
         osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, reset_vector, false, size);
-
-        //Set modulated values for osc2, adding reset vector and
-        pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
-        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2PWMOD], pw2_out, size);
-        arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
-        arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);
-        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2FREQUENCYMOD], fm2_out, size);
 
         //Adjust tuning
         osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
@@ -162,8 +135,8 @@ class Voice
         osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, reset_vector, ValuePanel[CTRL_OSC2SYNC], size);
 
         //If CTRL_OSCSPLIT enabled, silence each oscillator on oposite sides
-        arm_scale_f32(osc1_out, split_high, osc1_out, size);
-        arm_scale_f32(osc2_out, split_low, osc2_out, size);
+        arm_scale_f32(osc1_out, split_high_, osc1_out, size);
+        arm_scale_f32(osc2_out, split_low_, osc2_out, size);
 
         //Noise
         noise_.ProcessBlock(noise_out, size);
@@ -174,6 +147,8 @@ class Voice
         arm_add_f32(osc1_out, osc2_out, buf, size);
         arm_scale_f32(noise_out, ValuePanel[CTRL_NOISE], noise_out, size);
         arm_add_f32(buf, noise_out, buf, size);
+
+        //Filter goes here
 
         //Amplifier
         amp_env_.ProcessBlock(amp_out, size, env_gate_);
@@ -368,10 +343,35 @@ class VoiceManager
 
     void ProcessBlock(float *buf, size_t size)
     {
+        float lfo_out[size], pw1_out[size], pw2_out[size], pwlfo_out[size],
+                fm1_out[size], fm2_out[size], fmlfo_out[size], reset_vector[size];
+        float pw1_diff, pw2_diff;
+
+        //Set fixed values for LFO modulation buffers
+        arm_fill_f32(0.5, pwlfo_out, size);
+        arm_fill_f32(0, fmlfo_out, size);
+
+        //Process LFO - Might be a good idea to give LFO its own process function
+        lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, reset_vector, false, size);
+
+        //Set modulated values for osc1
+        pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1PWMOD], pw1_out, size);
+        arm_scale_f32(pw1_out, pw1_diff, pw1_out, size);
+        arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1FREQUENCYMOD], fm1_out, size);
+
+        //Set modulated values for osc2
+        pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2PWMOD], pw2_out, size);
+        arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
+        arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2FREQUENCYMOD], fm2_out, size);
+
         for(size_t i = 0; i < max_voices; i++)
         {
             float temp[size];
-            voices[i].ProcessBlock(temp, size);
+            voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, size);
             arm_add_f32(buf, temp, buf, size);
         }
     }
@@ -449,7 +449,7 @@ static Encoder          enc;
 MidiUartHandler         midi;
 CpuLoadMeter            loadMeter;
 
-void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
+void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
 {
     loadMeter.OnBlockStart();
     for(size_t i = 0; i < size; i++)
@@ -459,7 +459,7 @@ void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, 
     loadMeter.OnBlockEnd();
 }
 
-void AudioCallbackBlock(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
+void AudioCallbackBlock(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
 {
     loadMeter.OnBlockStart();
     float buf[size];
