@@ -126,25 +126,45 @@ class Voice
         float osc1_out[size], osc2_out[size], 
                 amp_out[size], lfo_out[size],
                 pw1_out[size], pw2_out[size], pwlfo_out[size],
-                fm1_out[size], fm2_out[size];
- 
-        std::fill_n (pwlfo_out, size, 0.5);
+                fm1_out[size], fm2_out[size], fmlfo_out[size];
 
+        //2%
+        arm_fill_f32(0.5, pwlfo_out, size);
+        arm_fill_f32(0, fmlfo_out, size);
         float pw1_diff = 0.5-ValuePanel[CTRL_OSC1PULSEWIDTH];
         float pw2_diff = 0.5-ValuePanel[CTRL_OSC2PULSEWIDTH];
 
-        lfo.ProcessBlock(lfo_out, pwlfo_out, size);
+        //24%
+        lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, size);
 
+        //4%
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1PWMOD], pw1_out, size);
         arm_scale_f32(pw1_out, pw1_diff, pw1_out, size);
         arm_offset_f32(pw1_out, ValuePanel[CTRL_OSC1PULSEWIDTH], pw1_out, size);
-        osc1_.ProcessBlock(osc1_out, pw1_out, size);
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC1FREQUENCYMOD], fm1_out, size);
 
+        //24%
+        osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, size);
+
+        //4%
         arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2PWMOD], pw2_out, size);
         arm_scale_f32(pw2_out, pw2_diff, pw2_out, size);
-        arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);        
-        osc2_.ProcessBlock(osc2_out, pw2_out, size);
+        arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, size);
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_OSC2FREQUENCYMOD], fm2_out, size);
 
+        //4%
+        osc2_.SetFreq(mtof(note_ + ValuePanel[CTRL_OSC2TUNECOARSE] + ValuePanel[CTRL_OSC2TUNEFINE]));
+
+        //1%
+        if(ValuePanel[CTRL_OSC2SYNC] && osc1_.IsEOC())
+        {
+            osc2_.Reset();
+        }
+
+        //24%
+        osc2_.ProcessBlock(osc2_out, pw2_out, fm2_out, size);
+
+        //8%
         arm_add_f32(osc1_out, osc2_out, buf, size);
         amp_env_.ProcessBlock(amp_out, size, env_gate_);
         arm_scale_f32(amp_out, velocity_, amp_out, size);
@@ -221,7 +241,8 @@ class Voice
         switch(param)
         {
             case CTRL_OSC1WAVEFORM: 
-                ValuePanel[CTRL_OSC1WAVEFORM] = ControlPanel[CTRL_OSC1WAVEFORM] / 16;
+                //Disabling polybleps until I optimize them
+                ValuePanel[CTRL_OSC1WAVEFORM] = ControlPanel[CTRL_OSC1WAVEFORM] / 26;
                 osc1_.SetWaveform(ValuePanel[CTRL_OSC1WAVEFORM]); 
                 break;
             case CTRL_OSC1PULSEWIDTH:
@@ -494,7 +515,7 @@ int main(void)
     lfo.SetAmp(1);
     lfo.SetWaveform(Oscillator::WAVE_SIN);
     //TODO: Change this from linear to logarithmic scaling
-    lfo.SetFreq(0);
+    lfo.SetFreq(0); 
 
     // start the audio callback
     hw.StartAudio(AudioCallbackBlock);

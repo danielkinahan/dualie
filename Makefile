@@ -18,7 +18,12 @@ $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_mult_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_add_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_scale_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_offset_f32.c \
+$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_fill_f32.c \
+$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_negate_f32.c \
+$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_clip_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/CommonTables/arm_common_tables.c
+
+#arm clip added specially
 
 C_INCLUDES += \
 -I$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Include 

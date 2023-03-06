@@ -99,7 +99,7 @@ class Oscillator
 
     /** Processes the waveform to be generated, returning size number of samples. This should be called once per audiocallback.
     */
-    void ProcessBlock(float *buf, float *pw_buf, size_t size);
+    void ProcessBlock(float *buf, float *pw_buf, float *fm_buf, size_t size);
 
     /** Processes the waveform to be generated, returning one sample. This should be called once per sample period.
     */
