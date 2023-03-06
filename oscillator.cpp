@@ -11,8 +11,13 @@ constexpr float TWO_PI_RECIP = 1.0f / TWOPI_F;
 
 void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *reset_vector, bool reset, size_t size)
 {
-    float double_pi_recip;
+    float double_pi_recip = 2.0f * TWO_PI_RECIP;
     float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];
+
+    //Block processing PhaseAdd
+    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
+    //Add phase
+    arm_add_f32(phase_vector, fm_buf, phase_vector, size);
 
     for (size_t i = 0; i < size; i++)
     {
@@ -29,13 +34,6 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
 
         phase_vector[i] = phase_;
     }
-
-    //Block processing PhaseAdd
-    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
-    //Add phase - this doesn't sound right
-    arm_add_f32(phase_vector, fm_buf, phase_vector, size);
-
-    double_pi_recip = 2.0f * TWO_PI_RECIP;
 
     switch(waveform_)
     {
@@ -61,7 +59,7 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
         case WAVE_SQUARE:
             arm_clip_f32(pw_buf, pw_vector, 0.f, 1.f, 16);
             arm_scale_f32(pw_vector, TWOPI_F, pw_rad_vector, size);
-            //I bet there is probably a better way of using ternary ops on a vector
+            
             for (size_t i = 0; i < size; i++)
             {
                 buf[i] = phase_vector[i] < pw_rad_vector[i] ? (1.0f) : -1.0f; 
@@ -72,6 +70,7 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
         //I'll leave these as simple loops for now
         
         //Currently polyblep_tri and polyblep_square take double the processing power
+        //TODO: try to remove fmodf for cmsis function
         case WAVE_POLYBLEP_TRI:
             arm_scale_f32(phase_vector, TWO_PI_RECIP, t_vector, size);
             for (size_t i = 0; i < size; i++)
