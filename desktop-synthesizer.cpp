@@ -238,15 +238,15 @@ class Voice
                 ValuePanel[CTRL_OSC1PWMOD] = ControlPanel[CTRL_OSC1PWMOD] / 127.f;
                 break;
             case CTRL_OSC2WAVEFORM:
-                ValuePanel[CTRL_OSC2WAVEFORM] = ControlPanel[CTRL_OSC2WAVEFORM] / 16;
+                ValuePanel[CTRL_OSC2WAVEFORM] = ControlPanel[CTRL_OSC2WAVEFORM] / 26;
                 osc2_.SetWaveform(ValuePanel[CTRL_OSC2WAVEFORM]); 
+                break;
+            case CTRL_OSC2PULSEWIDTH:
+                ValuePanel[CTRL_OSC2PULSEWIDTH] = ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f;
                 break;
             case CTRL_OSC2FREQUENCYMOD:
                 //change the scaling on this
                 ValuePanel[CTRL_OSC2FREQUENCYMOD] = ControlPanel[CTRL_OSC2FREQUENCYMOD] / 127.f;
-                break;
-            case CTRL_OSC2PULSEWIDTH:
-                ValuePanel[CTRL_OSC2PULSEWIDTH] = ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f;
                 break;
             case CTRL_OSC2PWMOD:
                 ValuePanel[CTRL_OSC2PWMOD] = ControlPanel[CTRL_OSC2PWMOD] / 127.f;

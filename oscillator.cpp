@@ -57,7 +57,7 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
             arm_offset_f32(buf, -1.0f, buf, size);
             break;
         case WAVE_SQUARE:
-            arm_clip_f32(pw_buf, pw_vector, 0.f, 1.f, 16);
+            arm_clip_f32(pw_buf, pw_vector, 0.f, 1.f, size);
             arm_scale_f32(pw_vector, TWOPI_F, pw_rad_vector, size);
             
             for (size_t i = 0; i < size; i++)
@@ -94,7 +94,7 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
             }
             break;
         case WAVE_POLYBLEP_SQUARE:
-            arm_clip_f32(pw_buf, pw_vector, 0.f, 1.f, 16);
+            arm_clip_f32(pw_buf, pw_vector, 0.f, 1.f, size);
             arm_scale_f32(pw_vector, TWOPI_F, pw_rad_vector, size);
 
             arm_scale_f32(phase_vector, TWO_PI_RECIP, t_vector, size);
