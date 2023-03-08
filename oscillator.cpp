@@ -14,23 +14,21 @@ void Oscillator::ProcessBlock(float *buf, float *pw_buf, float *fm_buf, float *r
     float double_pi_recip = 2.0f * TWO_PI_RECIP;
     float phase_vector[size], t_vector[size], pw_vector[size], pw_rad_vector[size];
 
-    //Block processing PhaseAdd
-    arm_scale_f32(fm_buf, TWOPI_F, fm_buf, size);
-    //Add phase
-    arm_add_f32(phase_vector, fm_buf, phase_vector, size);
-
     for (size_t i = 0; i < size; i++)
     {
-        phase_ += phase_inc_;
+        //Set phase to 0 if reset and at EOF for osc1
+        //Not sure why this isnt working anymore
+        phase_ *= !(reset && reset_vector[i]); 
+        //This is now going to be overwritten by Osc2
+        reset_vector[i] = (phase_ > TWOPI_F);
+
+        phase_ += phase_inc_ + fm_buf[i];
+
         if(phase_ > TWOPI_F)
         {
             phase_ -= TWOPI_F;
         }
         //eor_ = (phase_ - phase_inc_ < PI_F && phase_ >= PI_F); //end of rise - not using right now
-
-        phase_ *= !(reset && reset_vector[i]); 
-        //This is now going to be overwritten by Osc2
-        reset_vector[i] = (phase_ > TWOPI_F);
 
         phase_vector[i] = phase_;
     }
