@@ -136,10 +136,11 @@ class Voice
         arm_scale_f32(noise_out, ValuePanel[CTRL_NOISE], noise_out, BLOCK_SIZE);
         arm_add_f32(buf, noise_out, buf, BLOCK_SIZE);
 
-        //Filter goes here
+        //Filter
+        //filt_.ProcessBlock(buf, BLOCK_SIZE);
 
         //Amplifier
-        amp_env_.ProcessBlock(amp_out, size, env_gate_);
+        amp_env_.ProcessBlock(amp_out, BLOCK_SIZE, env_gate_);
         arm_scale_f32(amp_out, velocity_, amp_out, BLOCK_SIZE);
         arm_mult_f32(buf, amp_out, buf, BLOCK_SIZE);
     }

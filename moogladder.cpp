@@ -41,7 +41,7 @@ void MoogLadder::Init(float sample_rate)
     old_res_  = -1.0f;
 }
 
-void MoogLadder::ProcessBlock(float *buf, size_t size, float *in)
+void MoogLadder::ProcessBlock(float *buf, size_t size)
 {
     for (size_t i = 0; i < size; i++)
     {
@@ -88,15 +88,15 @@ void MoogLadder::ProcessBlock(float *buf, size_t size, float *in)
 
         for(int j = 0; j < 2; j++)
         {
-            in[i] -= res4 * delay[5];
+            buf[i] -= res4 * delay[5];
             delay[0] = stg[0]
-                = delay[0] + tune * (my_tanh(in[i] * THERMAL) - tanhstg[0]);
+                = delay[0] + tune * (my_tanh(buf[i] * THERMAL) - tanhstg[0]);
             for(int k = 1; k < 4; k++)
             {
-                in[i]     = stg[k - 1];
+                buf[i]     = stg[k - 1];
                 stg[k] = delay[k]
                         + tune
-                            * ((tanhstg[k - 1] = my_tanh(in[i] * THERMAL))
+                            * ((tanhstg[k - 1] = my_tanh(buf[i] * THERMAL))
                                 - (k != 3 ? tanhstg[k]
                                             : my_tanh(delay[k] * THERMAL)));
                 delay[k] = stg[k];

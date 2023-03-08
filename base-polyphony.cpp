@@ -21,20 +21,27 @@ class Voice
     {
         osc_.Init(samplerate);
         osc_.SetAmp(0.75f);
-        osc_.SetWaveform(Oscillator::WAVE_POLYBLEP_TRI);
+        osc_.SetWaveform(Oscillator::WAVE_SQUARE);
         env_.Init(samplerate);
         env_.SetSustainLevel(0.5f);
         env_.SetTime(ADSR_SEG_ATTACK, 0.1f);
         env_.SetTime(ADSR_SEG_DECAY, 0.005f);
         env_.SetTime(ADSR_SEG_RELEASE, 0.01f);
+        filt_.Init(samplerate);
+        filt_.SetFreq(2500.f);
+
     }
 
     void ProcessBlock(float *buf, size_t size)
     {
-        float amp_out[size], osc_out[size];
+        float amp_out[size], osc_out[size], empty[size], half[size];
+
+        arm_fill_f32(0.5f, half, size);
         env_.ProcessBlock(amp_out, size, env_gate_);
         
-        osc_.ProcessBlock(osc_out, size);
+        osc_.ProcessBlock(osc_out, half, empty, empty, false, size);
+
+        //filt_.ProcessBlock(osc_out, size);
 
         arm_mult_f32(osc_out, amp_out, buf, size);
     }
@@ -67,6 +74,7 @@ class Voice
   private:
     custom::Oscillator osc_;
     custom::Adsr       env_;
+    custom::MoogLadder filt_;
     float      note_, velocity_;
     bool       env_gate_;
 };
@@ -153,7 +161,7 @@ class VoiceManager
 };
 
 static DaisySeed        hw;
-MidiUsbHandler          midi;
+MidiUartHandler         midi;
 static VoiceManager<24> mgr;
 
 void AudioCallback(AudioHandle::InputBuffer  in, AudioHandle::OutputBuffer out, size_t size)
@@ -206,8 +214,7 @@ int main(void)
     hw.Init();
     hw.SetAudioBlockSize(16);
     
-    MidiUsbHandler::Config midi_cfg;
-    midi_cfg.transport_config.periph = MidiUsbTransport::Config::INTERNAL;
+    MidiUartHandler::Config midi_cfg;
     midi.Init(midi_cfg);
 
     mgr.Init(hw.AudioSampleRate());
