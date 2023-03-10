@@ -540,9 +540,30 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
     {
         switch(param)
         {
+            case CTRL_LFOWAVEFORM:
+                //No polybleps but have ramp
+                ValuePanel[CTRL_LFOWAVEFORM] = ControlPanel[CTRL_LFOWAVEFORM] / 26;
+                lfo.SetWaveform(ValuePanel[CTRL_LFOWAVEFORM]); 
+                break;
             case CTRL_LFOFREQUENCY:
+                //TODO implement tempo sync
                 ValuePanel[CTRL_LFOFREQUENCY] = ControlPanel[CTRL_LFOFREQUENCY] / 6.4f;
                 lfo.SetFreq(ValuePanel[CTRL_LFOFREQUENCY]);
+                break;
+            case CTRL_LFOTEMPOSYNC:
+                ValuePanel[CTRL_LFOTEMPOSYNC] = ControlPanel[CTRL_LFOTEMPOSYNC] ? 1 : 0;
+                break;
+            case CTRL_FXTYPE:
+                ValuePanel[CTRL_FXTYPE] = ControlPanel[CTRL_FXTYPE];
+                break;
+            case CTRL_FXPARAM1:
+                ValuePanel[CTRL_FXPARAM1] = ControlPanel[CTRL_FXPARAM1];
+                break;
+            case CTRL_FXPARAM2:
+                ValuePanel[CTRL_FXPARAM2] = ControlPanel[CTRL_FXPARAM2];
+                break;
+            case CTRL_FXMIX:
+                ValuePanel[CTRL_FXMIX] = ControlPanel[CTRL_FXMIX];
                 break;
 
             default: break;
@@ -570,9 +591,8 @@ int main(void)
     //uint8_t param = 0;
 
     lfo.SetAmp(1);
-    lfo.SetWaveform(Oscillator::WAVE_SIN);
-    //TODO: Change this from linear to logarithmic scaling
-    lfo.SetFreq(0); 
+    lfo.SetWaveform(ValuePanel[CTRL_LFOWAVEFORM]);
+    lfo.SetFreq(ValuePanel[CTRL_LFOFREQUENCY]); 
 
     // start the audio callback
     hw.StartAudio(AudioCallbackBlock);
