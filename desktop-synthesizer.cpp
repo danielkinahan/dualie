@@ -106,12 +106,16 @@ class Voice
         osc2_.Init(sample_rate);
         noise_.Init();
         amp_env_.Init(sample_rate);
+        filt_env_.Init(sample_rate);
         filt_.Init(sample_rate);
     }
 
     void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, float *fm1_out, float *fm2_out, float *filt_lfo, size_t size)
     {
-        float osc1_out[BLOCK_SIZE], osc2_out[BLOCK_SIZE], noise_out[BLOCK_SIZE], filt_freq[BLOCK_SIZE], amp_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
+        float osc1_out[BLOCK_SIZE], osc2_out[BLOCK_SIZE], noise_out[BLOCK_SIZE], 
+            filt_freq[BLOCK_SIZE], filt_env_out[BLOCK_SIZE], filt_mod[BLOCK_SIZE], 
+            amp_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
+        float velocity_freq, kbd_freq;
 
         //Process osc1, resets disabled
         osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, reset_vector, false, BLOCK_SIZE);
@@ -137,8 +141,19 @@ class Voice
         arm_add_f32(buf, noise_out, buf, BLOCK_SIZE);
 
         //Filter
+        arm_fill_f32(ValuePanel[CTRL_FILTERCUTOFF], filt_freq, BLOCK_SIZE);
         //Note filter modulated by Envelope, Velocity and Keybed
-        arm_scale_f32(filt_lfo, ValuePanel[CTRL_FILTERCUTOFF], filt_freq, BLOCK_SIZE);
+        //Velocity and keybed can add to the cutoff frequency
+        //Velocity - add 20khz * (velocity mod * velocity)
+        velocity_freq = 20000.f * ValuePanel[CTRL_FILTERVELOCITYMOD] * velocity_;
+        //Keybed - leaving this simple for now will refine later
+        kbd_freq = freq_ * ValuePanel[CTRL_FILTERKEYBEDTRACK];
+        //Add them to existing cutoff
+        arm_offset_f32(filt_freq, velocity_freq+kbd_freq, filt_freq, BLOCK_SIZE);
+        //Calculate filter envelope
+        filt_env_.ProcessBlock(filt_env_out, BLOCK_SIZE, env_gate_);
+        arm_mult_f32(filt_lfo, filt_env_out, filt_mod, BLOCK_SIZE);
+        arm_mult_f32(filt_mod, filt_freq, filt_freq, BLOCK_SIZE);
         filt_.ProcessBlock(buf, filt_freq, BLOCK_SIZE);
 
         //Amplifier
@@ -198,13 +213,15 @@ class Voice
     {
         note_     = note;
         velocity_ = velocity / 127.f;
-        osc1_.SetFreq(mtof(note_));
-        osc2_.SetFreq(mtof(note_));
+        freq_ = mtof(note_);
+        osc1_.SetFreq(freq_);
+        osc2_.SetFreq(freq_);
         env_gate_ = true;
         split_high_ = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
         split_low_ = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
         //Get envelope started so we can check if its active right away
         //amp_env_.Process(env_gate_);
+        //filt_env_.Process(env_gate_);
     }
 
     void OnNoteOff() { env_gate_ = false; }
@@ -213,6 +230,7 @@ class Voice
     {
         //Process paramater value changed
         //TODO: investigate ways to calculate without using expensive divisions
+        //TODO: remove unecessary controls from the voice class and move to voice mgr
         switch(param)
         {
             case CTRL_OSC1WAVEFORM: 
@@ -238,7 +256,6 @@ class Voice
                 ValuePanel[CTRL_OSC2PULSEWIDTH] = ControlPanel[CTRL_OSC2PULSEWIDTH] / 254.f;
                 break;
             case CTRL_OSC2FREQUENCYMOD:
-                //change the scaling on this
                 ValuePanel[CTRL_OSC2FREQUENCYMOD] = ControlPanel[CTRL_OSC2FREQUENCYMOD] / 127.f;
                 break;
             case CTRL_OSC2PWMOD:
@@ -273,6 +290,28 @@ class Voice
             case CTRL_FILTERLFOMOD:
                 ValuePanel[CTRL_FILTERLFOMOD] = ControlPanel[CTRL_FILTERLFOMOD] / 127.f;
                 break;
+            case CTRL_FILTERVELOCITYMOD:
+                ValuePanel[CTRL_FILTERVELOCITYMOD] = ControlPanel[CTRL_FILTERVELOCITYMOD] / 127.f;
+                break;
+            case CTRL_FILTERKEYBEDTRACK:
+                ValuePanel[CTRL_FILTERKEYBEDTRACK] = ControlPanel[CTRL_FILTERKEYBEDTRACK] / 127.f;
+                break;
+            case CTRL_FILTERATTACK:
+                ValuePanel[CTRL_FILTERATTACK] = ControlPanel[CTRL_FILTERATTACK] / 32.f;
+                filt_env_.SetTime(ADENV_SEG_ATTACK, (ValuePanel[CTRL_FILTERATTACK])); 
+                break;
+            case CTRL_FILTERDECAY:
+                ValuePanel[CTRL_FILTERDECAY] = ControlPanel[CTRL_FILTERDECAY] / 32.f;
+                filt_env_.SetTime(ADENV_SEG_DECAY, (ValuePanel[CTRL_FILTERDECAY])); 
+                break;
+            case CTRL_FILTERSUSTAIN:
+                ValuePanel[CTRL_FILTERSUSTAIN] = ControlPanel[CTRL_FILTERSUSTAIN] / 127.f;
+                filt_env_.SetSustainLevel(ValuePanel[CTRL_FILTERSUSTAIN]); 
+                break;
+            case CTRL_FILTERRELEASE: 
+                ValuePanel[CTRL_FILTERRELEASE] = ControlPanel[CTRL_FILTERRELEASE] / 64.f;
+                filt_env_.SetTime(ADSR_SEG_RELEASE, ValuePanel[CTRL_FILTERRELEASE]); 
+                break;
             case CTRL_AMPATTACK:
                 ValuePanel[CTRL_AMPATTACK] = ControlPanel[CTRL_AMPATTACK] / 32.f;
                 amp_env_.SetTime(ADENV_SEG_ATTACK, (ValuePanel[CTRL_AMPATTACK])); 
@@ -304,7 +343,7 @@ class Voice
     custom::Adsr       filt_env_;
     custom::Adsr       amp_env_;
     uint8_t            note_;
-    float              velocity_;
+    float              velocity_, freq_;
     bool               env_gate_, split_high_, split_low_;
 };
 
