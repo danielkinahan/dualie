@@ -137,7 +137,7 @@ class Voice
         arm_add_f32(buf, noise_out, buf, BLOCK_SIZE);
 
         //Filter
-        //filt_.ProcessBlock(buf, BLOCK_SIZE);
+        filt_.ProcessBlock(buf, BLOCK_SIZE);
 
         //Amplifier
         amp_env_.ProcessBlock(amp_out, BLOCK_SIZE, env_gate_);
@@ -201,6 +201,8 @@ class Voice
         env_gate_ = true;
         split_high_ = !ValuePanel[CTRL_OSCSPLIT] || note_ > 63;
         split_low_ = !ValuePanel[CTRL_OSCSPLIT] || note_ < 64;
+        //Get envelope started so we can check if its active right away
+        //amp_env_.Process(env_gate_);
     }
 
     void OnNoteOff() { env_gate_ = false; }
@@ -362,9 +364,12 @@ class VoiceManager
 
         for(size_t i = 0; i < max_voices; i++)
         {
-            float temp[BLOCK_SIZE];
-            voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, BLOCK_SIZE);
-            arm_add_f32(buf, temp, buf, BLOCK_SIZE);
+            //if(voices[i].IsActive())
+            //{
+                float temp[BLOCK_SIZE];
+                voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, BLOCK_SIZE);
+                arm_add_f32(buf, temp, buf, BLOCK_SIZE);
+            //}
         }
     }
 
@@ -435,7 +440,7 @@ class VoiceManager
     }
 };
 
-static VoiceManager<24> mgr;
+static VoiceManager<12> mgr;
 static DaisySeed        hw;
 static Encoder          enc;
 MidiUartHandler         midi;
@@ -457,7 +462,7 @@ void AudioCallbackBlock(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer o
     float buf[BLOCK_SIZE];
     mgr.ProcessBlock(buf, BLOCK_SIZE);
 
-    arm_scale_f32(buf, 0.1, buf, BLOCK_SIZE);
+    arm_scale_f32(buf, 0.5, buf, BLOCK_SIZE);
 
     out[0] = out[1] = buf;
 
