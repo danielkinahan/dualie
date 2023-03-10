@@ -109,9 +109,9 @@ class Voice
         filt_.Init(sample_rate);
     }
 
-    void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, float *fm1_out, float *fm2_out, size_t size)
+    void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, float *fm1_out, float *fm2_out, float *filt_lfo, size_t size)
     {
-        float osc1_out[BLOCK_SIZE], osc2_out[BLOCK_SIZE], noise_out[BLOCK_SIZE], amp_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
+        float osc1_out[BLOCK_SIZE], osc2_out[BLOCK_SIZE], noise_out[BLOCK_SIZE], filt_freq[BLOCK_SIZE], amp_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
 
         //Process osc1, resets disabled
         osc1_.ProcessBlock(osc1_out, pw1_out, fm1_out, reset_vector, false, BLOCK_SIZE);
@@ -137,7 +137,9 @@ class Voice
         arm_add_f32(buf, noise_out, buf, BLOCK_SIZE);
 
         //Filter
-        filt_.ProcessBlock(buf, BLOCK_SIZE);
+        //Note filter modulated by Envelope, Velocity and Keybed
+        arm_scale_f32(filt_lfo, ValuePanel[CTRL_FILTERCUTOFF], filt_freq, BLOCK_SIZE);
+        filt_.ProcessBlock(buf, filt_freq, BLOCK_SIZE);
 
         //Amplifier
         amp_env_.ProcessBlock(amp_out, BLOCK_SIZE, env_gate_);
@@ -335,7 +337,8 @@ class VoiceManager
     void ProcessBlock(float *buf, size_t size)
     {
         float lfo_out[BLOCK_SIZE], pw1_out[BLOCK_SIZE], pw2_out[BLOCK_SIZE], pwlfo_out[BLOCK_SIZE],
-                fm1_out[BLOCK_SIZE], fm2_out[BLOCK_SIZE], fmlfo_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
+                fm1_out[BLOCK_SIZE], fm2_out[BLOCK_SIZE], fmlfo_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE],
+                filt_lfo[BLOCK_SIZE], one_array[BLOCK_SIZE];
         float pw1_diff, pw2_diff;
 
         float fm_rad1 = ValuePanel[CTRL_OSC1FREQUENCYMOD] * TWOPI_F;
@@ -344,6 +347,9 @@ class VoiceManager
         //Set fixed values for LFO modulation buffers
         arm_fill_f32(0.5, pwlfo_out, BLOCK_SIZE);
         arm_fill_f32(0, fmlfo_out, BLOCK_SIZE);
+
+        //Array filled with 1s
+        arm_fill_f32(1, one_array, BLOCK_SIZE);
 
         //Process LFO - Might be a good idea to give LFO its own process function
         lfo.ProcessBlock(lfo_out, pwlfo_out, fmlfo_out, reset_vector, false, BLOCK_SIZE);
@@ -362,12 +368,18 @@ class VoiceManager
         arm_offset_f32(pw2_out, ValuePanel[CTRL_OSC2PULSEWIDTH], pw2_out, BLOCK_SIZE);
         arm_scale_f32(lfo_out, fm_rad2, fm2_out, BLOCK_SIZE);
 
+        //Set modulated values for filter
+        //System wide filter is modulated from LFO, note filter by Envelope, velocity and keybed
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_FILTERLFOMOD], filt_lfo, BLOCK_SIZE);
+        //LFO mod becomes subtrahend with 1 as minuend, difference is multiplied to cutoff frequency
+        arm_sub_f32(one_array, filt_lfo, filt_lfo, BLOCK_SIZE);
+
         for(size_t i = 0; i < max_voices; i++)
         {
             //if(voices[i].IsActive())
             //{
                 float temp[BLOCK_SIZE];
-                voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, BLOCK_SIZE);
+                voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, filt_lfo, BLOCK_SIZE);
                 arm_add_f32(buf, temp, buf, BLOCK_SIZE);
             //}
         }

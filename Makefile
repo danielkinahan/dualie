@@ -21,6 +21,7 @@ $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_offset_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_fill_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_negate_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_clip_f32.c \
+$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_sub_f32.c \
 $(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Source/CommonTables/arm_common_tables.c
 
 #arm clip added specially

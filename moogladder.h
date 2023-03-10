@@ -62,7 +62,7 @@ class MoogLadder
         float Process(const float input);
     
         /** Process mono buffer in place */
-        void ProcessBlock(float *buf, size_t size);
+        void ProcessBlock(float *buf, float *freq, size_t size);
 
         /** 
             Sets the cutoff frequency or half-way point of the filter.

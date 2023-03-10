@@ -68,9 +68,12 @@ float MoogLadder::Process(const float input)
     return total;
 }
 
-void MoogLadder::ProcessBlock(float *buf, size_t size)
+void MoogLadder::ProcessBlock(float *buf, float *freq, size_t size)
 {
-    for (size_t i=0; i < size; i++) {
+    for (size_t i=0; i < size; i++) 
+    {
+        //I could definitely process the frequency in blocks later on but it's not terrible on CPU usage
+        SetFreq(freq[i]);
         float input = buf[i];
         float total = 0.0f;
         float interp = 0.0f;
