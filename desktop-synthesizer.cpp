@@ -110,11 +110,13 @@ class Voice
         filt_.Init(sample_rate);
     }
 
-    void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, float *fm1_out, float *fm2_out, float *filt_lfo, size_t size)
+    void ProcessBlock(float *buf, float *pw1_out, float *pw2_out, 
+                        float *fm1_out, float *fm2_out, 
+                        float *filt_lfo, float *amp_lfo, size_t size)
     {
         float osc1_out[BLOCK_SIZE], osc2_out[BLOCK_SIZE], noise_out[BLOCK_SIZE], 
             filt_freq[BLOCK_SIZE], filt_env_out[BLOCK_SIZE], filt_mod[BLOCK_SIZE], 
-            amp_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
+            amp_out[BLOCK_SIZE], amp_env_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE];
         float velocity_freq, kbd_freq;
 
         //Process osc1, resets disabled
@@ -157,7 +159,8 @@ class Voice
         filt_.ProcessBlock(buf, filt_freq, BLOCK_SIZE);
 
         //Amplifier
-        amp_env_.ProcessBlock(amp_out, BLOCK_SIZE, env_gate_);
+        amp_env_.ProcessBlock(amp_env_out, BLOCK_SIZE, env_gate_);
+        arm_mult_f32(amp_env_out, amp_lfo, amp_out, BLOCK_SIZE);
         arm_scale_f32(amp_out, velocity_, amp_out, BLOCK_SIZE);
         arm_mult_f32(buf, amp_out, buf, BLOCK_SIZE);
     }
@@ -328,6 +331,9 @@ class Voice
                 ValuePanel[CTRL_AMPRELEASE] = ControlPanel[CTRL_AMPRELEASE] / 64.f;
                 amp_env_.SetTime(ADSR_SEG_RELEASE, ValuePanel[CTRL_AMPRELEASE]); 
                 break;
+            case CTRL_AMPLFOMOD:
+                ValuePanel[CTRL_AMPLFOMOD] = ControlPanel[CTRL_AMPLFOMOD] / 127.f;
+                break;
             default: break;
         }
     }
@@ -377,7 +383,7 @@ class VoiceManager
     {
         float lfo_out[BLOCK_SIZE], pw1_out[BLOCK_SIZE], pw2_out[BLOCK_SIZE], pwlfo_out[BLOCK_SIZE],
                 fm1_out[BLOCK_SIZE], fm2_out[BLOCK_SIZE], fmlfo_out[BLOCK_SIZE], reset_vector[BLOCK_SIZE],
-                filt_lfo[BLOCK_SIZE], one_array[BLOCK_SIZE];
+                filt_lfo[BLOCK_SIZE], amp_lfo[BLOCK_SIZE], one_array[BLOCK_SIZE];
         float pw1_diff, pw2_diff;
 
         float fm_rad1 = ValuePanel[CTRL_OSC1FREQUENCYMOD] * TWOPI_F;
@@ -408,17 +414,22 @@ class VoiceManager
         arm_scale_f32(lfo_out, fm_rad2, fm2_out, BLOCK_SIZE);
 
         //Set modulated values for filter
-        //System wide filter is modulated from LFO, note filter by Envelope, velocity and keybed
+        //System wide filter is modulated from LFO
         arm_scale_f32(lfo_out, ValuePanel[CTRL_FILTERLFOMOD], filt_lfo, BLOCK_SIZE);
         //LFO mod becomes subtrahend with 1 as minuend, difference is multiplied to cutoff frequency
         arm_sub_f32(one_array, filt_lfo, filt_lfo, BLOCK_SIZE);
+
+        arm_scale_f32(lfo_out, ValuePanel[CTRL_AMPLFOMOD], amp_lfo, BLOCK_SIZE);
+        arm_sub_f32(one_array, amp_lfo, amp_lfo, BLOCK_SIZE);
 
         for(size_t i = 0; i < max_voices; i++)
         {
             //if(voices[i].IsActive())
             //{
                 float temp[BLOCK_SIZE];
-                voices[i].ProcessBlock(temp, pw1_out, pw2_out, fm1_out, fm2_out, filt_lfo, BLOCK_SIZE);
+                voices[i].ProcessBlock(temp, pw1_out, pw2_out, 
+                                        fm1_out, fm2_out, 
+                                        filt_lfo, amp_lfo, BLOCK_SIZE);
                 arm_add_f32(buf, temp, buf, BLOCK_SIZE);
             //}
         }
@@ -532,7 +543,7 @@ void HandleControls(int ctrlValue, int param, bool midiCC)
         ControlPanel[param] += ctrlValue;
     }
 
-    if (param < 27)
+    if (param < 28)
     {
         mgr.SetParam(param);
     }
