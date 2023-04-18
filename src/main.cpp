@@ -1,12 +1,13 @@
-#include "daisy_seed.h"
-#include "daisysp.h"
-#include "desktop-synthesizer.h"
+#include <daisy_seed.h>
+#include <daisysp.h>
+#include <arm_math.h>
 
-#include "oscillator.h"
-#include "adsr.h"
-#include "moogladder.h"
-#include "whitenoise.h"
-#include "arm_math.h"
+#include "../include/main.h"
+#include "../include/oscillator.h"
+#include "../include/adsr.h"
+#include "../include/moogladder.h"
+#include "../include/whitenoise.h"
+
 
 using namespace std;
 using namespace daisy;

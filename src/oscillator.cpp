@@ -1,8 +1,8 @@
 #include <Utility/dsp.h>
-#include "oscillator.h"
-#include "arm_math.h"
-#include "arm_common_tables.h"
+#include <arm_math.h>
+#include <arm_common_tables.h>
 
+#include "../include/oscillator.h"
 using namespace custom;
 static inline float Polyblep(float phase_inc, float t);
 inline void SinBlock(float *buf, float *phase_vector, size_t size);

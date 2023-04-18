@@ -21,8 +21,9 @@
  * THE SOFTWARE.
  */
  
-#include "moogladder.h"
 #include <Utility/dsp.h>
+
+#include "../include/moogladder.h"
 
 using namespace custom;
 
