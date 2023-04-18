@@ -1,125 +1,81 @@
-# desktop-synthesizer
+<h1 align="center">
+  <br>
+  <a href="https://www.danielkinahan.ca"><img src="etc/KinasonicsLogo.png" alt="KinasonicsLogo" width="200"></a>
+  <br>
+  Dualie
+  <br>
+</h1>
 
-A polyphonic, multi-oscillator synth with many bells and many whistles. Based around the Daisy Seed platform.
+<h4 align="center">A polyphonic, multi-oscillator synth with many bells and many whistles. Built on the Daisy Seed platform.</h4>
+ 
+[//]: # (<p align="center">)
+[//]: # (  <a href="https://badge.fury.io/js/electron-markdownify">)
+[//]: # (    <img src="https://badge.fury.io/js/electron-markdownify.svg")
+[//]: # (         alt="Gitter">)
+[//]: # (  </a>)
+[//]: # (  <a href="https://gitter.im/amitmerchant1990/electron-markdownify"><img src="https://badges.gitter.im/amitmerchant1990/electron-markdownify.svg"></a>)
+[//]: # (  <a href="https://saythanks.io/to/bullredeyes@gmail.com">)
+[//]: # (      <img src="https://img.shields.io/badge/SayThanks.io-%E2%98%BC-1EAEDB.svg">)
+[//]: # (  </a>)
+[//]: # (  <a href="https://www.paypal.me/AmitMerchant">)
+[//]: # (    <img src="https://img.shields.io/badge/$-donate-ff69b4.svg?maxAge=2592000&amp;style=flat">)
+[//]: # (  </a>)
+[//]: # (</p>)
 
-## Controls
-| Control              | Description                 | Unit               |
-| --------------------| --------------------------- | ------------------ |
-| OSC1WAVEFORM         | Waveform of oscillator 1     | Wavetype                |
-| OSC1PULSEWIDTH       | Pulse width of oscillator 1  | %                  |
-| OSC1FREQUENCYMOD     | Frequency modulation of oscillator 1 from LFO | %  |
-| OSC1PWMOD            | Pulse width modulation of oscillator 1 from LFO| % |
-| OSC2WAVEFORM         | Waveform of oscillator 2     | Wavetype                |
-| OSC2PULSEWIDTH       | Pulse width of oscillator 2  | %                  |
-| OSC2FREQUENCYMOD     | Frequency modulation of oscillator 2 from LFO | % |
-| OSC2PWMOD            | Pulse width modulation of oscillator 2 from LFO| % |
-| OSC2TUNEFINE         | Fine tune of oscillator 2    | Cents              |
-| OSC2TUNECOARSE       | Coarse tune of oscillator 2  | Semitones          |
-| OSC2SYNC             | Oscillator 1 resets oscillator 2s cycle | True/False         |
-| NOISE                | Level of white noise         | dB                 |
-| OSCMIX               | Mix between oscillator 1 and 2 | %               |
-| OSCSPLIT             | Split keyboard at C4, left side is Osc1 and right is Osc2 | True/False            |
-| FILTERCUTOFF         | Cutoff frequency of filter   | Hz                 |
-| FILTERRESONANCE      | Resonance of filter           | %                 |
-| FILTERLFOMOD         | Frequency modulation of filter by LFO | Hz      |
-| FILTERVELOCITYMOD    | Modulation of filter by velocity | dB            |
-| FILTERKEYBEDTRACK    | Tracking of filter by keybed position | dB/octave |
-| FILTERATTACK         | Envelope attack of filter     | s                  |
-| FILTERDECAY          | Envelope decay of filter      | s                  |
-| FILTERSUSTAIN        | Envelope sustain of filter    | %                  |
-| FILTERRELEASE        | Envelope release of filter    | s                  |
-| AMPATTACK            | Envelope attack of amplifier | s                  |
-| AMPDECAY             | Envelope decay of amplifier   | s                  |
-| AMPSUSTAIN           | Envelope sustain of amplifier | %                  |
-| AMPRELEASE           | Envelope release of amplifier | s                  |
-| AMPLFOMOD            | Frequency modulation of amplifier by LFO | Hz |
-| LFOWAVEFORM          | Waveform of LFO               | Wavetype                |
-| LFOFREQUENCY         | Frequency of LFO              | Hz                 |
-| LFOTEMPOSYNC         | Synchronize LFO to tempo      | True/False                |
-| FXTYPE               | Type of effect                | N/A                |
-| FXPARAM1             | Parameter 1 of effect         | N/A                |
-| FXPARAM2             | Parameter 2 of effect         | N/A                |
-| FXMIX                | Mix level of effect           | %                  |
+<p align="center">
+  <a href="#key-features">Key Features</a> •
+  <a href="#how-to-use">How To Use</a> •
+  <a href="#license">License</a>
+</p>
 
-## Control-Flow Diagram
+## Key Features
 
-```mermaid
-flowchart TB
+* 12 voice polyphony
+  - Each voice has it's own filter and amplifier envelope
+* Dual oscillators with:
+  - Selectable waveforms
+  - Pulse width and frequency modulation
+  - Coarse and fine tuning
+  - Synchronicity
+* Digital moog ladder filter with modulatable cutoff
+* LFO with selectable waveform and frequency
+  - All modulations selectable by LFO
+* Selectable effects units
+  - Reverb
+  - Cube distortion
+  - Echo
+  - Chorus
 
-    LFO-->PW-Modulation-1
-    LFO-->PW-Modulation-2
-    LFO-->Frequency-Modulation-1
-    LFO-->Frequency-Modulation-2
-    LFO-->LFO-F
-    LFO-->LFO-A
-    
-    Osc1-->Mix
-    Osc2-->Mix
-    
-    Moise-->Filter
-    Mix-->Filter
-    
-    Filter-->Amp
-    
-    Amp-->FX
-    
-    FX-->Volume
-    subgraph Voice
-      subgraph Osc1
-        Wave-1
-        PW-1
-        Frequency-Modulation-1
-        PW-Modulation-1
-      end
-      subgraph Osc2
-        Wave-2
-        PW-2
-        Frequency-Modulation-2
-        PW-Modulation-2
-        Pitch
-        pitchsw(Fine/Octave)-->Pitch
-        Sync
-      end
-      subgraph OscControl
-        Mix
-        split(Split)
-      end
-      subgraph Filter
-        Cutoff
-        Resonance
-        subgraph Filter-Modulation
-          Velocity
-          LFO-F
-          Keybed-Tracking
-          subgraph Envelope-F
-            Attack-F
-            Decay-F
-            Sustain-F
-            Release-F
-          end
-        end
-      end
-      subgraph Amp
-        LFO-A
-        subgraph Envelope-A
-          Attack-A
-          Decay-A
-          Sustain-A
-          Release-A
-        end
-      end
-    end
-    subgraph LFO
-      Frequency
-      Waveform
-      sync(Tempo-Sync)
-    end
-    subgraph FX
-      Type
-      Param1
-      Param2
-      Mix
-    end
-    
-    
+## How To Use
+
+To clone and run this application, you'll need [the Daisy development toolchain](https://github.com/electro-smith/DaisyWiki/wiki/1.-Setting-Up-Your-Development-Environment) installed on your computer. After setting up and running the blink example, from your command line:
+
+```bash
+# Clone this repository, with submodules, with fast submodule download
+$ git clone --recurse-submodules -j8 https://github.com/danielkinahan/dualie
+
+# Go into libdaisy
+$ cd dualie/lib/libDaisy
+# Build all the files
+$ make all
+
+# Go into daisysp and do the same
+$ cd dualie/lib/DaisySP
+# Build all the files
+$ make all
 ```
+Then open the command palette using ```Ctrl+P/⌘+P``` and run ```task build_and_program_dfu```
+
+> **Note**
+> If you're using Windows, make sure you have your vscode default terminal set to Git Bash.
+
+## License
+
+MIT
+
+---
+
+> [danielkinahan.ca](https://www.danielkinahan.ca) &nbsp;&middot;&nbsp;
+> GitHub [@danielkinahan](https://github.com/danielkinahan)
+
+
